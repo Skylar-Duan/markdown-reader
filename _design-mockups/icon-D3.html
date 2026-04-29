@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>D3 · MD 上移版</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #2a2a2e;
+    color: #e8e8ea;
+    font-family: -apple-system, "Segoe UI", "Inter", system-ui, sans-serif;
+    padding: 56px 24px 80px;
+    min-height: 100vh;
+  }
+  .page-title { text-align: center; font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+  .page-sub { text-align: center; color: #a1a1a6; font-size: 13px; margin-bottom: 56px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 36px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+  .opt {
+    background: #3a3a3e;
+    border-radius: 16px;
+    padding: 32px 24px;
+    border: 1px solid #4a4a4e;
+  }
+  .opt-row {
+    display: flex;
+    gap: 28px;
+    align-items: center;
+    margin-bottom: 20px;
+    justify-content: center;
+  }
+  .icon-256 { width: 256px; height: 256px; flex-shrink: 0; }
+  .icon-128 { width: 128px; height: 128px; flex-shrink: 0; }
+  .icon-64  { width: 64px; height: 64px; flex-shrink: 0; }
+  .icon-32  { width: 32px; height: 32px; flex-shrink: 0; }
+  .opt-tag {
+    display: inline-block;
+    background: #2F80ED;
+    color: white;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .opt-name { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .opt-desc { color: #a1a1a6; font-size: 12.5px; line-height: 1.6; }
+  .desktop-preview {
+    display: flex;
+    margin-top: 16px;
+    padding: 14px;
+    background: linear-gradient(135deg, #2c5d8d, #5b3d8a);
+    border-radius: 8px;
+    align-items: center;
+    justify-content: center;
+  }
+  .desktop-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: white;
+    font-size: 11px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    width: 76px;
+  }
+
+  /* Reusable D3 icon as <symbol> would be cleaner; inline for simplicity */
+</style>
+</head>
+<body>
+
+<h1 class="page-title">D3 · MD 移到顶部空白区</h1>
+<p class="page-sub">MD 填到折角左边的空白处，下面 4 条原始文字线全保留 · 不再被压缩</p>
+
+<div class="grid">
+
+<!-- ════ D3 大尺寸单图（看清细节） ════ -->
+<div class="opt">
+  <div class="opt-tag">D3 · 256px 大图</div>
+  <div class="opt-name">看清字符位置</div>
+  <p class="opt-desc">MD 字号 60px，左对齐放在标题位（y=160-210），下方 4 条文字线在原 D 位置（y=240-372）。</p>
+
+  <div class="opt-row" style="justify-content:center;">
+    <svg class="icon-256" viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="112" fill="#FBF8F3"/>
+      <!-- Document outline -->
+      <path d="M 130 100 L 332 100 L 412 180 L 412 412 Q 412 432 392 432 L 130 432 Q 110 432 110 412 L 110 120 Q 110 100 130 100 Z" fill="#FFFFFF" stroke="#37352F" stroke-width="14" stroke-linejoin="round"/>
+      <!-- Folded corner -->
+      <path d="M 332 100 L 332 180 L 412 180" fill="#2F80ED" stroke="#37352F" stroke-width="14" stroke-linejoin="round"/>
+      <!-- MD title (top-left, in the empty space left of fold) -->
+      <text x="160" y="208" font-family="'Inter', system-ui, sans-serif" font-weight="900" font-size="60" fill="#111111" letter-spacing="-1.5">MD</text>
+      <!-- Original 4 text lines, untouched positions -->
+      <rect x="160" y="240" width="220" height="14" rx="7" fill="#9B9A97"/>
+      <rect x="160" y="284" width="180" height="14" rx="7" fill="#9B9A97"/>
+      <rect x="160" y="328" width="200" height="14" rx="7" fill="#9B9A97"/>
+      <rect x="160" y="372" width="120" height="14" rx="7" fill="#9B9A97"/>
+    </svg>
+  </div>
+</div>
+
+<!-- ════ D3 三种实际尺寸 ════ -->
+<div class="opt">
+  <div class="opt-tag">D3 · 实际系统尺寸</div>
+  <div class="opt-name">128 / 64 / 32 px 预览</div>
+  <p class="opt-desc">这是装好后桌面 / 任务栏 / 文件资源管理器看到的真实大小。</p>
+
+  <div class="opt-row">
+    <svg class="icon-128" viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="112" fill="#FBF8F3"/>
+      <path d="M 130 100 L 332 100 L 412 180 L 412 412 Q 412 432 392 432 L 130 432 Q 110 432 110 412 L 110 120 Q 110 100 130 100 Z" fill="#FFFFFF" stroke="#37352F" stroke-width="14" stroke-linejoin="round"/>
+      <path d="M 332 100 L 332 180 L 412 180" fill="#2F80ED" stroke="#37352F" stroke-width="14" stroke-linejoin="round"/>
+      <text x="160" y="208" font-family="'Inter', system-ui, sans-serif" font-weight="900" font-size="60" fill="#111111" letter-spacing="-1.5">MD</text>
+      <rect x="160" y="240" width="220" height="14" rx="7" fill="#9B9A97"/>
+      <rect x="160" y="284" width="180" height="14" rx="7" fill="#9B9A97"/>
+      <rect x="160" y="328" width="200" height="14" rx="7" fill="#9B9A97"/>
+      <rect x="160" y="372" width="120" height="14" rx="7" fill="#9B9A97"/>
+    </svg>
+    <svg class="icon-64" viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="112" fill="#FBF8F3"/>
+      <path d="M 130 100 L 332 100 L 412 180 L 412 412 Q 412 432 392 432 L 130 432 Q 110 432 110 412 L 110 120 Q 110 100 130 100 Z" fill="#FFFFFF" stroke="#37352F" stroke-width="14" stroke-linejoin="round"/>
+      <path d="M 332 100 L 332 180 L 412 180" fill="#2F80ED" stroke="#37352F" stroke-width="14" stroke-linejoin="round"/>
+      <text x="160" y="208" font-family="'Inter', system-ui, sans-serif" font-weight="900" font-size="60" fill="#111111" letter-spacing="-1.5">MD</text>
+      <rect x="160" y="240" width="220" height="14" rx="7" fill="#9B9A97"/>
+      <rect x="160" y="284" width="180" height="14" rx="7" fill="#9B9A97"/>
+      <rect x="160" y="328" width="200" height="14" rx="7" fill="#9B9A97"/>
+      <rect x="160" y="372" width="120" height="14" rx="7" fill="#9B9A97"/>
+    </svg>
+    <svg class="icon-32" viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="112" fill="#FBF8F3"/>
+      <path d="M 130 100 L 332 100 L 412 180 L 412 412 Q 412 432 392 432 L 130 432 Q 110 432 110 412 L 110 120 Q 110 100 130 100 Z" fill="#FFFFFF" stroke="#37352F" stroke-width="22" stroke-linejoin="round"/>
+      <path d="M 332 100 L 332 180 L 412 180" fill="#2F80ED" stroke="#37352F" stroke-width="22" stroke-linejoin="round"/>
+      <text x="160" y="218" font-family="'Inter', system-ui, sans-serif" font-weight="900" font-size="72" fill="#111111" letter-spacing="-1.5">MD</text>
+      <rect x="160" y="252" width="220" height="20" rx="10" fill="#9B9A97"/>
+      <rect x="160" y="296" width="180" height="20" rx="10" fill="#9B9A97"/>
+      <rect x="160" y="340" width="200" height="20" rx="10" fill="#9B9A97"/>
+      <rect x="160" y="384" width="120" height="20" rx="10" fill="#9B9A97"/>
+    </svg>
+  </div>
+  <div class="desktop-preview">
+    <div class="desktop-tile">
+      <svg class="icon-32" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="112" fill="#FBF8F3"/>
+        <path d="M 130 100 L 332 100 L 412 180 L 412 412 Q 412 432 392 432 L 130 432 Q 110 432 110 412 L 110 120 Q 110 100 130 100 Z" fill="#FFFFFF" stroke="#37352F" stroke-width="22" stroke-linejoin="round"/>
+        <path d="M 332 100 L 332 180 L 412 180" fill="#2F80ED" stroke="#37352F" stroke-width="22" stroke-linejoin="round"/>
+        <text x="160" y="218" font-family="'Inter', system-ui, sans-serif" font-weight="900" font-size="72" fill="#111111" letter-spacing="-1.5">MD</text>
+        <rect x="160" y="252" width="220" height="20" rx="10" fill="#9B9A97"/>
+        <rect x="160" y="296" width="180" height="20" rx="10" fill="#9B9A97"/>
+        <rect x="160" y="340" width="200" height="20" rx="10" fill="#9B9A97"/>
+        <rect x="160" y="384" width="120" height="20" rx="10" fill="#9B9A97"/>
+      </svg>
+      <span>Markdown<br>Reader</span>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<p style="text-align:center; color:#a1a1a6; font-size:13px; margin-top:60px;">
+  <strong style="color:#e8e8ea;">关键改动</strong>：MD 移到 y=160-210（折角左边空白区），<strong style="color:#e8e8ea;">下方 4 条线全部回到原 D 位置（240/284/328/372）</strong>。<br><br>
+  回 <strong style="color:#e8e8ea;">OK 用 D3 / 还要再调</strong>（说要再上 / 再下 / 再大 / 再小 / 字体换什么）。
+</p>
+
+</body>
+</html>

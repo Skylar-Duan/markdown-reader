@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-04-29
+
+### Added
+- **多窗口支持** · 双击多个 .md 文件，每个独立窗口（单实例 + 多 WebviewWindow 模式）。关闭一个不影响另一个，主题/语言/最近文件/插件状态跨窗口共享
+- **新应用图标** · Notion 风文档 + 蓝色折角 + 黑色 MD 标题 + 灰色文字线（替代之前的 M↓ 设计）
+
+### Changed
+- **Ctrl+E 切换模式时保留滚动位置** · 之前会跳到顶部，现在按比例恢复到原阅读 / 编辑位置
+
+### Tech
+- 新增依赖：`tauri-plugin-single-instance`、`urlencoding`
+- 多窗口通过 URL hash (`#file=<encoded-path>`) 传递文件路径
+- Capabilities 放开 `win-*` 通配，新窗口继承所有权限
+
 ## [1.0.0] — 2026-04-29
 
 ### Added

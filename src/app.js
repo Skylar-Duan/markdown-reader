@@ -215,7 +215,16 @@ async function boot() {
 
   // Hookup file ops
   fileOps.setupDragDrop();
-  await fileOps.setupCliArgs();
+
+  // Multi-window support: secondary windows get the file via URL hash
+  // (set by the single-instance plugin in Rust). First window falls back
+  // to CLI args.
+  const hashFile = readFileFromHash();
+  if (hashFile) {
+    setTimeout(() => fileOps.open(hashFile), 50);
+  } else {
+    await fileOps.setupCliArgs();
+  }
 
   // Setup scroll spy for TOC
   setupScrollSpy(document.getElementById("content"), document.getElementById("toc"));
@@ -269,22 +278,58 @@ async function rerender() {
   statusBar.setStats(state.rawText);
 }
 
-function switchMode(newMode) {
+// Capture current scroll position as a 0..1 fraction, so it survives
+// mode switches even when read & edit views have different total heights.
+function getScrollProgress() {
+  const el = state.mode === "edit"
+    ? document.getElementById("editor-input")
+    : document.getElementById("content");
+  if (!el) return 0;
+  const max = Math.max(0, el.scrollHeight - el.clientHeight);
+  return max > 0 ? el.scrollTop / max : 0;
+}
+
+function applyScrollProgress(progress) {
+  // Wait two animation frames so layout (and any plugin post-processing
+  // that can change heights) has settled before we restore the position.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const el = state.mode === "edit"
+      ? document.getElementById("editor-input")
+      : document.getElementById("content");
+    if (!el) return;
+    const max = Math.max(0, el.scrollHeight - el.clientHeight);
+    el.scrollTop = max * progress;
+  }));
+}
+
+async function switchMode(newMode) {
   if (newMode === state.mode) return;
 
-  // Edit → Read: pull text from editor into state, rerender
+  // Snapshot scroll progress in the OLD view BEFORE we switch
+  const progress = getScrollProgress();
+
   if (state.mode === "edit" && newMode === "read") {
+    // Edit → Read: pull latest text from editor into state, then rerender
     state.rawText = editor.getText();
-    rerender();
-  }
-  // Read → Edit: push state text into editor
-  if (state.mode === "read" && newMode === "edit") {
+    state.mode = newMode;
+    applyMode(newMode, i18n);
+    statusBar.setMode(newMode);
+    await rerender();
+  } else if (state.mode === "read" && newMode === "edit") {
+    // Read → Edit: push state text into editor
     editor.setText(state.rawText);
+    state.mode = newMode;
+    applyMode(newMode, i18n);
+    statusBar.setMode(newMode);
     setTimeout(() => editor.focus(), 50);
+  } else {
+    state.mode = newMode;
+    applyMode(newMode, i18n);
+    statusBar.setMode(newMode);
   }
-  state.mode = newMode;
-  applyMode(newMode, i18n);
-  statusBar.setMode(newMode);
+
+  // Restore the equivalent scroll position in the NEW view
+  applyScrollProgress(progress);
 
   // Toggle pill button
   const btn = document.getElementById("mode-toggle");
@@ -367,6 +412,19 @@ function setupContentClickHandler() {
       openExternalUrl?.(href);
     }
   });
+}
+
+// Parse `#file=<encoded-path>` from URL hash for multi-window support
+function readFileFromHash() {
+  const hash = window.location.hash;
+  if (!hash || hash.length < 2) return null;
+  const m = hash.match(/(?:^#|&)file=([^&]+)/);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return null;
+  }
 }
 
 function setupBeforeUnload() {
