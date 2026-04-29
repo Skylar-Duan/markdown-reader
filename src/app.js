@@ -1,4 +1,4 @@
-// app.js — main application entry, wires all modules together
+// app.js — main entry, wires modules together with multi-tab state
 
 import { renderMarkdown } from "./modules/renderer.js";
 import { extractTOC, renderTOC, setupScrollSpy } from "./modules/toc.js";
@@ -20,24 +20,37 @@ import * as katexPlugin from "./modules/plugins/katex.js";
 import { toast } from "./modules/toast.js";
 import { shouldShowFirstRun, showFirstRunDialog } from "./modules/firstRunDialog.js";
 
-// External link routing through Tauri shell (lazy loaded)
-let openExternalUrl = (url) => {
-  // Default: try Tauri shell, fall back to window.open
+// External link routing through Tauri shell (lazy)
+const openExternalUrl = (url) => {
   import("@tauri-apps/plugin-shell")
     .then(shell => shell.open(url))
     .catch(() => window.open(url, "_blank"));
 };
 
-// ── App state ─────────────────────────────────────────────────────────────
-const state = {
-  filePath: null,
-  rawText: "",
-  mode: "read",      // "read" | "edit"
-  encoding: "UTF-8",
-  isWelcome: true
-};
+// ── Tab data model ────────────────────────────────────────────────────────
+let _nextTabId = 1;
+function makeTab({ filePath = null, rawText = "", encoding = "UTF-8" } = {}) {
+  return {
+    id: _nextTabId++,
+    filePath,
+    rawText,
+    encoding,
+    mode: "read",          // "read" | "edit"
+    dirty: false,
+    isWelcome: !filePath && !rawText,
+    contentScrollTop: 0,
+    editorScrollTop: 0,
+    editorSelStart: 0,
+    editorSelEnd: 0
+  };
+}
 
-// ── Boot ──────────────────────────────────────────────────────────────────
+const tabs = [];           // list of tab objects
+let state = null;          // alias for currently active tab (mutated in place)
+
+function activeTab() { return state; }
+
+// ── Module instances ──────────────────────────────────────────────────────
 const i18n = new I18n({}, "en");
 let theme;
 let editor;
@@ -49,11 +62,12 @@ let aboutDialog;
 let helpDialog;
 let langPickerEl;
 
+// ── Boot ──────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", boot);
+
 async function boot() {
-  // Load locales and apply
-  const locales = await loadLocales();
-  i18n.locales = locales;
+  // Locales
+  i18n.locales = await loadLocales();
   i18n.setLocale(detectInitialLocale());
 
   // Theme
@@ -61,12 +75,15 @@ async function boot() {
 
   // Editor
   editor = new Editor(document.getElementById("editor-input"), (newText) => {
+    if (!state) return;
     state.rawText = newText;
+    state.dirty = true;
     statusBar?.setStats(newText);
     statusBar?.setDirty(true);
+    renderTabBar();  // dirty marker on the tab
   });
 
-  // StatusBar / Zoom / Search / Dialogs
+  // Other modules
   statusBar = new StatusBar(i18n);
   zoom = new Zoom();
   search = new Search(i18n);
@@ -77,83 +94,70 @@ async function boot() {
   fileOps = new FileOps({
     i18n,
     onLoaded: ({ path, content, encoding }) => {
-      state.filePath = path;
-      state.rawText = content;
-      state.encoding = encoding || "UTF-8";
-      state.isWelcome = false;
-      editor.setText(content);
-      statusBar.setPath(path);
-      statusBar.setEncoding(state.encoding);
-      statusBar.setStats(content);
-      statusBar.setDirty(false);
-      const name = path.split(/[\\/]/).pop();
-      document.getElementById("window-title").textContent = `${name} — Markdown Reader`;
-      rerender();
+      // Open in a new tab (or replace empty welcome)
+      addFileTab(path, content, encoding);
     },
     onSaved: (newPath) => {
-      if (newPath) {
-        state.filePath = newPath;
-        statusBar.setPath(newPath);
-        const name = newPath.split(/[\\/]/).pop();
-        document.getElementById("window-title").textContent = `${name} — Markdown Reader`;
-      }
+      if (!state) return;
+      if (newPath) state.filePath = newPath;
+      state.dirty = false;
       editor.clearDirty();
+      statusBar.setPath(state.filePath);
       statusBar.setDirty(false);
+      renderTabBar();
+      updateWindowTitle();
     },
-    getDirty: () => editor.isDirty(),
-    getCurrent: () => state
+    getDirty: () => state?.dirty || false,
+    getCurrent: () => state || { filePath: null, rawText: "" }
   });
 
-  // i18n DOM apply on load + on change
+  // i18n DOM application
   i18n.applyToDOM();
   i18n.onChange(() => {
     i18n.applyToDOM();
     statusBar.refresh();
     refreshLangLabel();
+    renderTabBar();  // tab labels for "Untitled"
   });
 
-  // ── Plugin init ────────────────────────────────────────────────────────
+  // Plugins
   if (mermaidPlugin.isEnabled()) await mermaidPlugin.setEnabled(true);
   if (katexPlugin.isEnabled()) await katexPlugin.setEnabled(true);
 
-  // ── Wire UI ────────────────────────────────────────────────────────────
+  // UI wiring
   setupModeToggle();
   setupThemeToggle();
   setupLangPicker();
   setupContentClickHandler();
   setupBeforeUnload();
+  setupTabBar();
 
-  // ── Actions object ────────────────────────────────────────────────────
+  // Actions for menu / shortcuts
   const actions = {
     open: () => fileOps.open(),
     save: () => fileOps.save(),
     saveAs: () => fileOps.saveAs(),
     print: () => window.print(),
     setDefault: () => fileOps.setAsDefaultMd(),
-    close: async () => {
-      if (await fileOps.confirmDiscard()) {
-        try {
-          const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
-          getCurrentWebviewWindow().close();
-        } catch {
-          window.close();
-        }
-      }
-    },
-    undo: () => { if (state.mode === "edit") document.execCommand("undo"); },
-    redo: () => { if (state.mode === "edit") document.execCommand("redo"); },
-    cut: () => { if (state.mode === "edit") document.execCommand("cut"); },
+    close: () => closeActiveTab(),
+    newTab: () => newEmptyTab(),
+    nextTab: () => switchToNeighborTab(+1),
+    prevTab: () => switchToNeighborTab(-1),
+
+    undo: () => { if (state?.mode === "edit") document.execCommand("undo"); },
+    redo: () => { if (state?.mode === "edit") document.execCommand("redo"); },
+    cut: () => { if (state?.mode === "edit") document.execCommand("cut"); },
     copy: () => {
-      if (state.mode === "edit") {
+      if (state?.mode === "edit") {
         document.execCommand("copy");
       } else {
         const sel = window.getSelection().toString();
         if (sel) navigator.clipboard.writeText(sel);
       }
     },
-    paste: () => { if (state.mode === "edit") document.execCommand("paste"); },
+    paste: () => { if (state?.mode === "edit") document.execCommand("paste"); },
     selectAll: () => {
-      if (state.mode === "edit") {
+      if (state?.mode === "edit") {
         editor.selectAll();
       } else {
         const r = document.createRange();
@@ -166,8 +170,8 @@ async function boot() {
     find: () => search.open(),
 
     setMode: (m) => switchMode(m),
-    toggleMode: () => switchMode(state.mode === "read" ? "edit" : "read"),
-    getMode: () => state.mode,
+    toggleMode: () => switchMode(state?.mode === "read" ? "edit" : "read"),
+    getMode: () => state?.mode || "read",
     toggleTOC: () => {
       const app = document.getElementById("app");
       app.dataset.sidebar = app.dataset.sidebar === "hidden" ? "" : "hidden";
@@ -201,7 +205,6 @@ async function boot() {
     isKatexEnabled: () => katexPlugin.isEnabled(),
 
     escape: () => {
-      // Close any open menus/dropdowns; let other escape handlers take over
       document.querySelectorAll(".menu-dropdown, .lang-dropdown").forEach(d => d.remove());
     }
   };
@@ -209,58 +212,263 @@ async function boot() {
   setupShortcuts(actions);
   setupMenus(i18n, actions);
 
-  // Initial render
-  applyMode(state.mode, i18n);
-  await renderInitial();
-
-  // Hookup file ops
   fileOps.setupDragDrop();
 
-  // Multi-window support: secondary windows get the file via URL hash
-  // (set by the single-instance plugin in Rust). First window falls back
-  // to CLI args.
-  const hashFile = readFileFromHash();
-  if (hashFile) {
-    setTimeout(() => fileOps.open(hashFile), 50);
-  } else {
-    await fileOps.setupCliArgs();
-  }
+  // Tauri event: secondary launches route here to open in new tab
+  setupTauriOpenFileEvent();
 
-  // Setup scroll spy for TOC
+  // Initial state: 1 welcome tab, then maybe load CLI arg into it
+  newEmptyTab();
+  await fileOps.setupCliArgs();
+
   setupScrollSpy(document.getElementById("content"), document.getElementById("toc"));
 
-  // First-run prompt: ask to set as default .md handler
-  // Only show if no file was opened via CLI (so it doesn't pop over actual content)
-  if (shouldShowFirstRun() && !state.filePath) {
+  // First-run prompt
+  if (shouldShowFirstRun() && !state?.filePath) {
     setTimeout(() => {
-      showFirstRunDialog(
-        i18n,
-        () => fileOps.setAsDefaultMd(),
-        () => {}
-      );
+      showFirstRunDialog(i18n, () => fileOps.setAsDefaultMd(), () => {});
     }, 500);
   }
 }
 
-async function renderInitial() {
-  if (!state.filePath) {
-    state.isWelcome = true;
+async function setupTauriOpenFileEvent() {
+  try {
+    const { listen } = await import("@tauri-apps/api/event");
+    await listen("open-file-in-tab", async (event) => {
+      const path = event.payload;
+      if (typeof path === "string" && path.length > 0) {
+        await fileOps.open(path);  // → onLoaded → addFileTab
+      }
+    });
+  } catch (e) {
+    console.warn("Tauri event listen failed:", e);
+  }
+}
+
+// ── Tab operations ────────────────────────────────────────────────────────
+function newEmptyTab() {
+  const t = makeTab();
+  tabs.push(t);
+  activateTab(t.id);
+}
+
+function addFileTab(path, content, encoding) {
+  // If active tab is an untouched welcome tab, replace it instead of adding
+  const cur = activeTab();
+  if (cur && cur.isWelcome && !cur.dirty && !cur.filePath) {
+    cur.filePath = path;
+    cur.rawText = content;
+    cur.encoding = encoding || "UTF-8";
+    cur.isWelcome = false;
+    cur.dirty = false;
+    cur.mode = "read";
+    cur.contentScrollTop = 0;
+    cur.editorScrollTop = 0;
+    cur.editorSelStart = 0;
+    cur.editorSelEnd = 0;
+    rerenderActiveTab();
+    return;
+  }
+  const t = makeTab({ filePath: path, rawText: content, encoding });
+  t.isWelcome = false;
+  tabs.push(t);
+  activateTab(t.id);
+}
+
+async function closeActiveTab() {
+  const cur = activeTab();
+  if (!cur) {
+    closeWindow();
+    return;
+  }
+  // Confirm discard if dirty
+  if (cur.dirty) {
+    const ok = await fileOps.confirmDiscard();
+    if (!ok) return;
+  }
+  removeTab(cur.id);
+}
+
+function removeTab(id) {
+  const idx = tabs.findIndex(t => t.id === id);
+  if (idx === -1) return;
+  tabs.splice(idx, 1);
+  if (tabs.length === 0) {
+    closeWindow();
+    return;
+  }
+  // Activate neighbor: prefer the one to the right; else previous
+  const newActive = tabs[idx] || tabs[idx - 1];
+  activateTab(newActive.id);
+}
+
+async function closeWindow() {
+  try {
+    const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+    await getCurrentWebviewWindow().close();
+  } catch {
+    window.close();
+  }
+}
+
+function switchToNeighborTab(direction) {
+  if (tabs.length < 2) return;
+  const idx = tabs.findIndex(t => t.id === state?.id);
+  const next = (idx + direction + tabs.length) % tabs.length;
+  activateTab(tabs[next].id);
+}
+
+// Save outgoing tab's UI state, switch to the new tab, restore its state.
+async function activateTab(id) {
+  // Save outgoing tab's view state
+  if (state) {
+    persistActiveViewState();
+  }
+
+  const t = tabs.find(x => x.id === id);
+  if (!t) return;
+  state = t;
+
+  // Apply mode (which view is visible)
+  applyMode(state.mode, i18n);
+
+  // Set editor text & dirty flag (always, so undo history matches per-tab content)
+  editor.setText(state.rawText);
+  editor.dirty = state.dirty;
+
+  // Render content (or welcome) for this tab
+  if (state.isWelcome && !state.filePath) {
     renderWelcome(i18n, fileOps.getRecent(), (p) => fileOps.open(p));
-    statusBar.refresh();
     document.getElementById("toc").innerHTML = "";
   } else {
     await rerender();
   }
+
+  // Restore scroll positions + cursor (after layout settles)
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const c = document.getElementById("content");
+    const ta = document.getElementById("editor-input");
+    if (state.mode === "read") {
+      c.scrollTop = state.contentScrollTop || 0;
+    } else {
+      ta.scrollTop = state.editorScrollTop || 0;
+      ta.selectionStart = state.editorSelStart || 0;
+      ta.selectionEnd = state.editorSelEnd || 0;
+      ta.focus();
+    }
+  }));
+
+  // Status bar / window title / tab bar UI
+  statusBar.setPath(state.filePath);
+  statusBar.setEncoding(state.encoding);
+  statusBar.setStats(state.rawText);
+  statusBar.setMode(state.mode);
+  statusBar.setDirty(state.dirty);
+  updateWindowTitle();
+  renderTabBar();
 }
 
+function persistActiveViewState() {
+  if (!state) return;
+  if (state.mode === "edit") {
+    state.rawText = editor.getText();
+    state.dirty = editor.isDirty();
+    const ta = document.getElementById("editor-input");
+    state.editorScrollTop = ta.scrollTop;
+    state.editorSelStart = ta.selectionStart;
+    state.editorSelEnd = ta.selectionEnd;
+  }
+  state.contentScrollTop = document.getElementById("content").scrollTop;
+}
+
+// ── Tab bar UI ────────────────────────────────────────────────────────────
+function setupTabBar() {
+  document.getElementById("tab-new").addEventListener("click", () => newEmptyTab());
+}
+
+function renderTabBar() {
+  const container = document.getElementById("tab-list");
+  container.innerHTML = "";
+  for (const t of tabs) {
+    const li = document.createElement("li");
+    li.className = "tab" + (t.id === state?.id ? " active" : "");
+    li.dataset.tabId = t.id;
+    li.title = t.filePath || i18n.t("tab.untitled");
+
+    const name = document.createElement("span");
+    name.className = "tab-name";
+    name.textContent = t.filePath
+      ? t.filePath.split(/[\\/]/).pop()
+      : i18n.t("tab.untitled");
+    li.appendChild(name);
+
+    if (t.dirty) {
+      const dot = document.createElement("span");
+      dot.className = "tab-dirty";
+      dot.textContent = "●";
+      li.appendChild(dot);
+    }
+
+    const close = document.createElement("button");
+    close.className = "tab-close";
+    close.textContent = "✕";
+    close.title = i18n.t("tab.close");
+    close.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      // If closing active tab, use the discard-confirming flow
+      if (t.id === state?.id) {
+        await closeActiveTab();
+      } else {
+        if (t.dirty) {
+          // Switch to that tab first so the confirm dialog shows its name
+          activateTab(t.id);
+          await closeActiveTab();
+        } else {
+          removeTab(t.id);
+        }
+      }
+    });
+    li.appendChild(close);
+
+    li.addEventListener("click", (e) => {
+      if (e.target.closest(".tab-close")) return;
+      if (t.id !== state?.id) activateTab(t.id);
+    });
+
+    // Middle-click to close
+    li.addEventListener("auxclick", (e) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        if (t.id === state?.id) closeActiveTab();
+        else if (t.dirty) { activateTab(t.id); closeActiveTab(); }
+        else removeTab(t.id);
+      }
+    });
+
+    container.appendChild(li);
+  }
+}
+
+function updateWindowTitle() {
+  const name = state?.filePath
+    ? state.filePath.split(/[\\/]/).pop()
+    : i18n.t("tab.untitled");
+  document.title = `${name} — Markdown Reader`;
+}
+
+// ── Render / mode switch ──────────────────────────────────────────────────
 async function rerender() {
-  if (state.isWelcome && !state.filePath) return;
+  if (!state) return;
+  if (state.isWelcome && !state.filePath) {
+    renderWelcome(i18n, fileOps.getRecent(), (p) => fileOps.open(p));
+    document.getElementById("toc").innerHTML = "";
+    return;
+  }
 
   const html = renderMarkdown(state.rawText);
   const output = document.getElementById("renderer-output");
   output.innerHTML = html;
 
-  // Apply optional plugins
   if (mermaidPlugin.isEnabled()) {
     mermaidPlugin.applyTheme(theme.effective());
     await mermaidPlugin.processBlocks(output);
@@ -269,7 +477,6 @@ async function rerender() {
     katexPlugin.processBlocks(output);
   }
 
-  // TOC
   const tocItems = extractTOC(html);
   renderTOC(tocItems, document.getElementById("toc"), {
     emptyText: i18n.t("toc.empty")
@@ -278,9 +485,24 @@ async function rerender() {
   statusBar.setStats(state.rawText);
 }
 
-// Capture current scroll position as a 0..1 fraction, so it survives
-// mode switches even when read & edit views have different total heights.
+async function rerenderActiveTab() {
+  // Rebuild active tab's view from scratch (used when content changes externally)
+  applyMode(state.mode, i18n);
+  editor.setText(state.rawText);
+  editor.dirty = state.dirty;
+  await rerender();
+  statusBar.setPath(state.filePath);
+  statusBar.setEncoding(state.encoding);
+  statusBar.setStats(state.rawText);
+  statusBar.setMode(state.mode);
+  statusBar.setDirty(state.dirty);
+  updateWindowTitle();
+  renderTabBar();
+}
+
+// Capture current scroll progress as a 0..1 fraction
 function getScrollProgress() {
+  if (!state) return 0;
   const el = state.mode === "edit"
     ? document.getElementById("editor-input")
     : document.getElementById("content");
@@ -289,55 +511,68 @@ function getScrollProgress() {
   return max > 0 ? el.scrollTop / max : 0;
 }
 
-function applyScrollProgress(progress) {
-  // Wait two animation frames so layout (and any plugin post-processing
-  // that can change heights) has settled before we restore the position.
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    const el = state.mode === "edit"
-      ? document.getElementById("editor-input")
-      : document.getElementById("content");
-    if (!el) return;
-    const max = Math.max(0, el.scrollHeight - el.clientHeight);
-    el.scrollTop = max * progress;
-  }));
+// Set cursor to a character index near the given scroll progress.
+// This prevents focus() from auto-scrolling away from our restored position.
+function syncCursorToProgress(textarea, progress) {
+  const text = textarea.value;
+  if (!text.length) return;
+  const target = Math.floor(text.length * progress);
+  // Snap cursor to start of nearest line (cleaner UX)
+  const before = text.slice(0, target);
+  const lineStart = before.lastIndexOf("\n") + 1;
+  textarea.selectionStart = lineStart;
+  textarea.selectionEnd = lineStart;
 }
 
 async function switchMode(newMode) {
-  if (newMode === state.mode) return;
-
-  // Snapshot scroll progress in the OLD view BEFORE we switch
+  if (!state || newMode === state.mode) return;
   const progress = getScrollProgress();
 
   if (state.mode === "edit" && newMode === "read") {
-    // Edit → Read: pull latest text from editor into state, then rerender
+    // Edit → Read: pull text from editor, rerender
     state.rawText = editor.getText();
+    state.dirty = editor.isDirty();
     state.mode = newMode;
     applyMode(newMode, i18n);
     statusBar.setMode(newMode);
+    statusBar.setDirty(state.dirty);
     await rerender();
+    // Restore scroll in #content
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const c = document.getElementById("content");
+      const max = Math.max(0, c.scrollHeight - c.clientHeight);
+      c.scrollTop = max * progress;
+    }));
   } else if (state.mode === "read" && newMode === "edit") {
-    // Read → Edit: push state text into editor
+    // Read → Edit:
+    //  1. Load text into editor
+    //  2. Place cursor near scroll position (so focus doesn't jump)
+    //  3. Set scrollTop to exact target
+    //  4. Focus
     editor.setText(state.rawText);
+    editor.dirty = state.dirty;
     state.mode = newMode;
     applyMode(newMode, i18n);
     statusBar.setMode(newMode);
-    setTimeout(() => editor.focus(), 50);
-  } else {
-    state.mode = newMode;
-    applyMode(newMode, i18n);
-    statusBar.setMode(newMode);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const ta = document.getElementById("editor-input");
+      syncCursorToProgress(ta, progress);
+      const max = Math.max(0, ta.scrollHeight - ta.clientHeight);
+      ta.scrollTop = max * progress;
+      ta.focus();
+      // Save these so tab switch later restores
+      state.editorScrollTop = ta.scrollTop;
+      state.editorSelStart = ta.selectionStart;
+      state.editorSelEnd = ta.selectionEnd;
+    }));
   }
-
-  // Restore the equivalent scroll position in the NEW view
-  applyScrollProgress(progress);
-
-  // Toggle pill button
-  const btn = document.getElementById("mode-toggle");
-  btn.classList.add("pill-active");
+  renderTabBar();
 }
 
+// ── Various small UI handlers ─────────────────────────────────────────────
 function setupModeToggle() {
   document.getElementById("mode-toggle").addEventListener("click", () => {
+    if (!state) return;
     switchMode(state.mode === "read" ? "edit" : "read");
   });
 }
@@ -346,7 +581,7 @@ function setupThemeToggle() {
   document.getElementById("theme-toggle").addEventListener("click", () => {
     theme.cycle();
     mermaidPlugin.applyTheme(theme.effective());
-    if (state.filePath || !state.isWelcome) rerender();
+    if (state && (state.filePath || !state.isWelcome)) rerender();
   });
 }
 
@@ -366,7 +601,6 @@ function setupLangPicker() {
 
     const dropdown = document.createElement("div");
     dropdown.className = "lang-dropdown";
-
     SUPPORTED_LOCALES.forEach(code => {
       const item = document.createElement("button");
       item.className = "lang-option";
@@ -379,7 +613,6 @@ function setupLangPicker() {
       });
       dropdown.appendChild(item);
     });
-
     document.body.appendChild(dropdown);
     const rect = langPickerEl.getBoundingClientRect();
     dropdown.style.position = "absolute";
@@ -393,44 +626,27 @@ function setupLangPicker() {
 }
 
 function setupContentClickHandler() {
-  // Route external links through system browser
   document.getElementById("renderer-output").addEventListener("click", (e) => {
     const a = e.target.closest("a");
     if (!a) return;
     const href = a.getAttribute("href");
     if (!href) return;
     if (href.startsWith("#")) {
-      // anchor — let it scroll naturally OR scroll-into-view
       e.preventDefault();
-      const id = href.slice(1);
-      const target = document.getElementById(id);
+      const target = document.getElementById(href.slice(1));
       target?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
     if (a.dataset.external === "1" || /^https?:\/\//i.test(href)) {
       e.preventDefault();
-      openExternalUrl?.(href);
+      openExternalUrl(href);
     }
   });
 }
 
-// Parse `#file=<encoded-path>` from URL hash for multi-window support
-function readFileFromHash() {
-  const hash = window.location.hash;
-  if (!hash || hash.length < 2) return null;
-  const m = hash.match(/(?:^#|&)file=([^&]+)/);
-  if (!m) return null;
-  try {
-    return decodeURIComponent(m[1]);
-  } catch {
-    return null;
-  }
-}
-
 function setupBeforeUnload() {
-  // Tauri 2's window close requires confirmDiscard; window.beforeunload also fires for browser-mode
   window.addEventListener("beforeunload", (e) => {
-    if (editor.isDirty()) {
+    if (tabs.some(t => t.dirty)) {
       e.preventDefault();
       e.returnValue = "";
     }
@@ -438,4 +654,9 @@ function setupBeforeUnload() {
 }
 
 // Expose for debugging
-window.__app = { state, i18n, theme, editor, statusBar, fileOps, rerender };
+window.__app = {
+  get state() { return state; },
+  get tabs() { return tabs; },
+  i18n, theme, editor, statusBar, fileOps, rerender,
+  newEmptyTab, addFileTab, activateTab, removeTab
+};

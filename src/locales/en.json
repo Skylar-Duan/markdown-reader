@@ -73,5 +73,12 @@
   "firstrun.title": "Welcome to Markdown Reader",
   "firstrun.body": "Set Markdown Reader as the default app for .md files? Then double-clicking .md will open in this app. You can set this later from the File menu.",
   "firstrun.set_default": "Set as Default",
-  "firstrun.skip": "Not Now"
+  "firstrun.skip": "Not Now",
+  "tab.untitled": "Untitled",
+  "tab.new": "New Tab",
+  "tab.close": "Close Tab",
+  "tab.next": "Next Tab",
+  "tab.prev": "Previous Tab",
+  "menu.file.new_tab": "New Tab",
+  "menu.file.close_tab": "Close Tab"
 }

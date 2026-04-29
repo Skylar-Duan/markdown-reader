@@ -15,8 +15,10 @@
 </head>
 <body>
   <div class="app" id="app">
-    <header class="titlebar" data-tauri-drag-region>
-      <span class="title" id="window-title" data-tauri-drag-region>Markdown Reader</span>
+    <header class="tabbar" data-tauri-drag-region>
+      <ul class="tabs" id="tab-list" role="tablist"></ul>
+      <button class="tab-new" id="tab-new" title="New tab (Ctrl+T)">+</button>
+      <div class="tabbar-drag" data-tauri-drag-region></div>
     </header>
     <nav class="menubar">
       <button class="menu-item" data-menu="file" data-i18n="menu.file">文件</button>

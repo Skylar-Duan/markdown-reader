@@ -3,7 +3,9 @@
 export function buildMenuConfig(actions) {
   return {
     file: [
+      { i18n: "menu.file.new_tab", shortcut: "Ctrl+T", action: () => actions.newTab() },
       { i18n: "menu.file.open", shortcut: "Ctrl+O", action: () => actions.open() },
+      { type: "separator" },
       { i18n: "menu.file.save", shortcut: "Ctrl+S", action: () => actions.save() },
       { i18n: "menu.file.save_as", shortcut: "Ctrl+Shift+S", action: () => actions.saveAs() },
       { type: "separator" },
@@ -11,7 +13,7 @@ export function buildMenuConfig(actions) {
       { type: "separator" },
       { i18n: "menu.file.set_default", action: () => actions.setDefault() },
       { type: "separator" },
-      { i18n: "menu.file.close", shortcut: "Ctrl+W", action: () => actions.close() }
+      { i18n: "menu.file.close_tab", shortcut: "Ctrl+W", action: () => actions.close() }
     ],
     edit: [
       { i18n: "menu.edit.undo", shortcut: "Ctrl+Z", action: () => actions.undo() },

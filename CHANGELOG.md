@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-04-29
+
+### Changed (Breaking UX)
+- **多 Tab 替代多窗口** · 按用户反馈，恢复成 Win11 记事本样式：所有 .md 在**同一个窗口的 Tab 里切换**，不再各开独立窗口。
+  - 顶部 Tab 栏：每个文件一个 Tab，× 关闭，+ 新建
+  - 双击新 .md（或拖入 / Ctrl+O）→ 在当前窗口加新 Tab
+  - **Ctrl+T** 新建 Tab，**Ctrl+W** 关闭当前 Tab，**Ctrl+Tab / Ctrl+Shift+Tab** 前后切换，也支持 **Ctrl+PgDown / Ctrl+PgUp**
+  - 中键点击 Tab 关闭
+  - 关闭最后一个 Tab → 关闭窗口
+  - 每 Tab 独立：文件路径 / 阅读·编辑模式 / 未保存状态 / 滚动位置 / 光标
+  - 全局共享：主题 / 语言 / 最近文件 / 字号 / 插件状态
+
+### Fixed
+- **Ctrl+E 切换模式 · 真正保留滚动位置** · v1.1.0 切到编辑模式时 `textarea.focus()` 会把光标位置滚进视窗，覆盖我们设的 `scrollTop`。修法：切到 edit 前先把光标位置同步到对应的滚动比例处（按行起始对齐），再 focus → focus 不再触发滚动跳转。现在不管在 read 模式滚到哪，切到 edit 都从对应位置开始编辑。
+
+### Tech
+- 新增 Tauri event `open-file-in-tab`：单实例插件捕获第 2 次启动 → emit 事件 → 前端监听 → 加 Tab（不再 WebviewWindowBuilder）
+- 移除 `urlencoding` 依赖（不再走 URL hash 路径）
+- Capabilities 收回到只 `main` window
+
 ## [1.1.0] — 2026-04-29
 
 ### Added

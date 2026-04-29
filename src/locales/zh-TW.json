@@ -73,5 +73,12 @@
   "firstrun.title": "歡迎使用 Markdown Reader",
   "firstrun.body": "要把 Markdown Reader 設為 .md 檔案的預設開啟方式嗎？之後雙擊 .md 就會用本程式開啟。可稍後在「檔案」選單再設。",
   "firstrun.set_default": "設為預設",
-  "firstrun.skip": "暫不設定"
+  "firstrun.skip": "暫不設定",
+  "tab.untitled": "未命名",
+  "tab.new": "新增分頁",
+  "tab.close": "關閉分頁",
+  "tab.next": "下一個分頁",
+  "tab.prev": "上一個分頁",
+  "menu.file.new_tab": "新增分頁",
+  "menu.file.close_tab": "關閉分頁"
 }

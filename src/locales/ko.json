@@ -73,5 +73,12 @@
   "firstrun.title": "Markdown Reader에 오신 것을 환영합니다",
   "firstrun.body": ".md 파일의 기본 앱으로 Markdown Reader를 설정하시겠습니까? .md 파일을 두 번 클릭하면 이 앱이 열립니다. 나중에 파일 메뉴에서 설정할 수도 있습니다.",
   "firstrun.set_default": "기본으로 설정",
-  "firstrun.skip": "나중에"
+  "firstrun.skip": "나중에",
+  "tab.untitled": "제목 없음",
+  "tab.new": "새 탭",
+  "tab.close": "탭 닫기",
+  "tab.next": "다음 탭",
+  "tab.prev": "이전 탭",
+  "menu.file.new_tab": "새 탭",
+  "menu.file.close_tab": "탭 닫기"
 }

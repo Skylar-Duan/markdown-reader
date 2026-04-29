@@ -73,5 +73,12 @@
   "firstrun.title": "Markdown Reader へようこそ",
   "firstrun.body": "Markdown Reader を .md ファイルの既定アプリに設定しますか？設定すれば、.md ファイルをダブルクリックでこのアプリが起動します。後でファイルメニューから設定もできます。",
   "firstrun.set_default": "既定に設定",
-  "firstrun.skip": "後で"
+  "firstrun.skip": "後で",
+  "tab.untitled": "無題",
+  "tab.new": "新しいタブ",
+  "tab.close": "タブを閉じる",
+  "tab.next": "次のタブ",
+  "tab.prev": "前のタブ",
+  "menu.file.new_tab": "新しいタブ",
+  "menu.file.close_tab": "タブを閉じる"
 }

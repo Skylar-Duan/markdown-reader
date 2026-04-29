@@ -73,5 +73,12 @@
   "firstrun.title": "欢迎使用 Markdown Reader",
   "firstrun.body": "要把 Markdown Reader 设为 .md 文件的默认打开方式吗？以后双击 .md 就用本程序打开。可以稍后在「文件」菜单里再设。",
   "firstrun.set_default": "设为默认",
-  "firstrun.skip": "暂不设置"
+  "firstrun.skip": "暂不设置",
+  "tab.untitled": "未命名",
+  "tab.new": "新建标签",
+  "tab.close": "关闭标签",
+  "tab.next": "下一个标签",
+  "tab.prev": "上一个标签",
+  "menu.file.new_tab": "新建标签",
+  "menu.file.close_tab": "关闭标签"
 }

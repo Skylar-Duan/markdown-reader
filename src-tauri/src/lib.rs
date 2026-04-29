@@ -3,47 +3,37 @@ mod commands;
 use commands::{
     read_file, write_file, file_size, file_exists, get_cli_args, set_as_default_md,
 };
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager};
 
 /// Find a Markdown-looking file path in argv (skipping argv[0] = exe path).
-fn find_md_arg(args: &[String]) -> Option<&String> {
+fn find_md_arg(args: &[String]) -> Option<String> {
     args.iter().skip(1).find(|a| {
         let lower = a.to_lowercase();
         lower.ends_with(".md")
             || lower.ends_with(".markdown")
             || lower.ends_with(".mdown")
             || lower.ends_with(".mkd")
-    })
+    }).cloned()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        // Single-instance plugin: when a 2nd launch happens, route the new
-        // file argument to the existing process which spawns a new window.
+        // Single-instance plugin: when a 2nd launch happens, route the file
+        // argument to the existing primary instance which opens it as a NEW TAB.
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             log::info!("second instance args: {:?}", args);
-            let file = find_md_arg(&args);
-            let label = format!(
-                "win-{}",
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_millis()
-            );
-            let url = match file {
-                Some(f) => format!("index.html#file={}", urlencoding::encode(f)),
-                None => "index.html".to_string(),
-            };
-            match WebviewWindowBuilder::new(app, &label, WebviewUrl::App(url.into()))
-                .title("Markdown Reader")
-                .inner_size(1100.0, 760.0)
-                .min_inner_size(600.0, 400.0)
-                .center()
-                .build()
-            {
-                Ok(_) => log::info!("created new window: {}", label),
-                Err(e) => log::error!("failed to create window: {}", e),
+            if let Some(file) = find_md_arg(&args) {
+                if let Some(main) = app.get_webview_window("main") {
+                    let _ = main.set_focus();
+                    // Frontend listens on event "open-file-in-tab"
+                    let _ = app.emit("open-file-in-tab", file);
+                }
+            } else {
+                // No file → just focus existing window
+                if let Some(main) = app.get_webview_window("main") {
+                    let _ = main.set_focus();
+                }
             }
         }))
         .plugin(tauri_plugin_log::Builder::default().build())
