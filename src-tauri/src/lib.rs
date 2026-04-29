@@ -26,9 +26,9 @@ pub fn run() {
             if let Some(main) = app.get_webview_window("main") {
                 // Restore from minimized / hidden state, then bring to front.
                 // set_focus() alone doesn't unminimize on Windows.
-                if main.is_minimized().unwrap_or(false) {
-                    let _ = main.unminimize();
-                }
+                // unminimize() is unconditional: it's a no-op if not minimized,
+                // and is_minimized() can return stale state in some cases.
+                let _ = main.unminimize();
                 let _ = main.show();
                 let _ = main.set_focus();
             }
