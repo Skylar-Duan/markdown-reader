@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] — 2026-04-29
+
+### Fixed
+- **第二次双击 .md 时窗口正确弹回前台** · 之前窗口若被最小化到任务栏，再双击新文件虽然能加 Tab，但窗口不会还原。修法：单实例插件回调里 `set_focus()` 之前先 `unminimize()` + `show()`（Windows 上光 `set_focus()` 不还原最小化窗口）。
+- **移除第一次启动弹的"设为默认"对话框** · 这个对话框跑的 `reg add` 在某些场景失败，且**冗余**——NSIS 安装器装的时候已经通过 `fileAssociations` 自动注册关联（安装界面那个"Set as default for .md files"勾选项就是它）。菜单里的"设为默认"手动入口保留作兜底。
+
 ## [1.2.0] — 2026-04-29
 
 ### Changed (Breaking UX)

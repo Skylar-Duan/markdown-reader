@@ -18,7 +18,6 @@ import { HelpDialog } from "./modules/helpDialog.js";
 import * as mermaidPlugin from "./modules/plugins/mermaid.js";
 import * as katexPlugin from "./modules/plugins/katex.js";
 import { toast } from "./modules/toast.js";
-import { shouldShowFirstRun, showFirstRunDialog } from "./modules/firstRunDialog.js";
 
 // External link routing through Tauri shell (lazy)
 const openExternalUrl = (url) => {
@@ -222,13 +221,6 @@ async function boot() {
   await fileOps.setupCliArgs();
 
   setupScrollSpy(document.getElementById("content"), document.getElementById("toc"));
-
-  // First-run prompt
-  if (shouldShowFirstRun() && !state?.filePath) {
-    setTimeout(() => {
-      showFirstRunDialog(i18n, () => fileOps.setAsDefaultMd(), () => {});
-    }, 500);
-  }
 }
 
 async function setupTauriOpenFileEvent() {

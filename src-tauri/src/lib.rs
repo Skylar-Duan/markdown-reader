@@ -23,17 +23,18 @@ pub fn run() {
         // argument to the existing primary instance which opens it as a NEW TAB.
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             log::info!("second instance args: {:?}", args);
+            if let Some(main) = app.get_webview_window("main") {
+                // Restore from minimized / hidden state, then bring to front.
+                // set_focus() alone doesn't unminimize on Windows.
+                if main.is_minimized().unwrap_or(false) {
+                    let _ = main.unminimize();
+                }
+                let _ = main.show();
+                let _ = main.set_focus();
+            }
             if let Some(file) = find_md_arg(&args) {
-                if let Some(main) = app.get_webview_window("main") {
-                    let _ = main.set_focus();
-                    // Frontend listens on event "open-file-in-tab"
-                    let _ = app.emit("open-file-in-tab", file);
-                }
-            } else {
-                // No file → just focus existing window
-                if let Some(main) = app.get_webview_window("main") {
-                    let _ = main.set_focus();
-                }
+                // Frontend listens on event "open-file-in-tab"
+                let _ = app.emit("open-file-in-tab", file);
             }
         }))
         .plugin(tauri_plugin_log::Builder::default().build())
