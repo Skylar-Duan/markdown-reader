@@ -1,0 +1,25 @@
+# Node
+node_modules/
+.pnpm-store/
+
+# Rust / Tauri
+src-tauri/target/
+# Cargo.lock IS committed for reproducible binary builds
+
+# Frontend build outputs (vite output)
+build/
+
+# Final installers (uploaded to GitHub Releases instead)
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs / temp
+*.log
+.tmp/

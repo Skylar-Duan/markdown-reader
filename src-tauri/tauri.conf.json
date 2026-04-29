@@ -1,0 +1,65 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Markdown Reader",
+  "version": "1.0.0",
+  "identifier": "com.dbwen.mdreader",
+  "build": {
+    "frontendDist": "../build",
+    "devUrl": "http://localhost:1430",
+    "beforeDevCommand": "pnpm vite:dev",
+    "beforeBuildCommand": "pnpm vite:build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Markdown Reader",
+        "width": 1100,
+        "height": 760,
+        "minWidth": 600,
+        "minHeight": 400,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false,
+        "center": true,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' tauri: ipc: http://ipc.localhost https://ipc.localhost; img-src 'self' data: https: http: asset: ipc: http://asset.localhost https://asset.localhost; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost http: https:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi", "nsis"],
+    "category": "Productivity",
+    "shortDescription": "Lightweight Markdown reader",
+    "longDescription": "A simple, beautiful Markdown reader for Windows. Replaces Notepad for .md files with rendered output, edit mode, 5 languages, and light/dark themes.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown", "mdown", "mkd"],
+        "name": "MarkdownReader.md",
+        "description": "Markdown Document",
+        "role": "Editor"
+      }
+    ],
+    "windows": {
+      "wix": {
+        "language": ["en-US", "zh-CN", "zh-TW", "ja-JP", "ko-KR"]
+      },
+      "nsis": {
+        "displayLanguageSelector": true,
+        "languages": ["English", "SimpChinese", "TradChinese", "Japanese", "Korean"],
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {}
+}

@@ -1,0 +1,25 @@
+html[data-theme="light"] {
+  --bg-primary: #FFFFFF;
+  --bg-sidebar: #F7F6F3;
+  --bg-hover: #EBEAE7;
+  --bg-active: #E5E3DF;
+  --bg-overlay: rgba(15, 15, 15, 0.4);
+  --border: #EBEAE7;
+  --border-strong: #D9D8D5;
+  --text-primary: #37352F;
+  --text-secondary: #787774;
+  --text-tertiary: #9B9A97;
+  --accent: #2F80ED;
+  --accent-text: #FFFFFF;
+  --code-bg: #F1EFEC;
+  --code-block-bg: #F7F6F3;
+  --code-text: #EB5757;
+  --shadow-soft: 0 1px 3px rgba(0,0,0,0.04);
+  --badge-bg: #F1EFEC;
+  --badge-bg-hover: #E5E3DF;
+  --pill-active-bg: #2F80ED;
+  --pill-active-text: #FFFFFF;
+  --warning: #E89B4B;
+  --error: #EB5757;
+  --success: #27AE60;
+}

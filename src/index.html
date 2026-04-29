@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https: http: asset: ipc:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://*">
+  <title>Markdown Reader</title>
+  <link rel="stylesheet" href="styles/reset.css">
+  <link rel="stylesheet" href="styles/theme-light.css">
+  <link rel="stylesheet" href="styles/theme-dark.css">
+  <link rel="stylesheet" href="styles/layout.css">
+  <link rel="stylesheet" href="styles/markdown.css">
+  <link rel="stylesheet" href="styles/highlight-light.css" id="hljs-light">
+  <link rel="stylesheet" href="styles/highlight-dark.css" id="hljs-dark" disabled>
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="titlebar" data-tauri-drag-region>
+      <span class="title" id="window-title" data-tauri-drag-region>Markdown Reader</span>
+    </header>
+    <nav class="menubar">
+      <button class="menu-item" data-menu="file" data-i18n="menu.file">文件</button>
+      <button class="menu-item" data-menu="edit" data-i18n="menu.edit">编辑</button>
+      <button class="menu-item" data-menu="view" data-i18n="menu.view">视图</button>
+      <button class="menu-item" data-menu="help" data-i18n="menu.help">帮助</button>
+      <div class="menu-spacer"></div>
+      <div class="menu-right">
+        <button class="badge" id="lang-picker" title="Language">🌐 <span id="lang-label">中文</span></button>
+        <button class="badge" id="theme-toggle" title="Theme">🌗</button>
+        <button class="badge mode-btn pill-active" id="mode-toggle"><span id="mode-icon">📖</span> <span id="mode-label" data-i18n="mode.read">阅读</span></button>
+      </div>
+    </nav>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-label" data-i18n="toc.label">大纲</div>
+      <ul class="toc" id="toc"></ul>
+    </aside>
+    <main class="content" id="content">
+      <div id="renderer-output"></div>
+      <textarea id="editor-input" hidden spellcheck="false"></textarea>
+    </main>
+    <footer class="statusbar">
+      <span id="status-path" data-i18n="status.no_file">📄 未打开文件</span>
+      <span id="status-encoding">UTF-8</span>
+      <span id="status-stats">0 字</span>
+      <div class="spacer"></div>
+      <span id="status-mode" data-i18n="status.read_mode">📖 阅读模式</span>
+      <span>Markdown</span>
+    </footer>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
