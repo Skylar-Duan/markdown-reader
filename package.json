@@ -1,6 +1,6 @@
 {
   "name": "markdown-reader",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "A simple, beautiful Markdown reader for Windows",
   "type": "module",
   "private": true,

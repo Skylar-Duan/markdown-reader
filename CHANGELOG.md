@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] — 2026-05-05
+
+### Reverted
+- **撤回 v1.3 阅读模式可编辑 + 工具栏 改造尝试**。该方向 5 次迭代（v1.3.0–v1.3.4）始终无法在真实 Webview2 里稳定工作，每次发布都引入新 bug。决定回退到 v1.2.1 稳定基线，发布为 v1.2.2 标记此次回退。
+
+### Documentation
+- 新增 [`docs/postmortem/2026-05-05-wysiwyg-attempt.md`](docs/postmortem/2026-05-05-wysiwyg-attempt.md) 复盘失败原因和教训
+
 ## [1.2.1] — 2026-04-29
 
 ### Fixed
