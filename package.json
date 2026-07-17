@@ -1,6 +1,6 @@
 {
   "name": "markdown-reader",
-  "version": "1.2.2",
+  "version": "1.4.0",
   "description": "A simple, beautiful Markdown reader for Windows",
   "type": "module",
   "private": true,
@@ -8,6 +8,9 @@
     "tauri": "tauri",
     "dev": "tauri dev",
     "build": "tauri build",
+    "assets:vditor": "node scripts/copy-vditor-assets.mjs",
+    "previte:dev": "pnpm assets:vditor",
+    "previte:build": "pnpm assets:vditor",
     "vite:dev": "vite",
     "vite:build": "vite build",
     "test": "vitest run",
@@ -29,6 +32,7 @@
     "highlight.js": "^11.9.0",
     "katex": "^0.16.0",
     "marked": "^12.0.0",
-    "mermaid": "^11.0.0"
+    "mermaid": "^11.0.0",
+    "vditor": "^3.11.2"
   }
 }

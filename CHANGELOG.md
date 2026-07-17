@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — 2026-07-17
+
+### Added
+- **全新编辑模式：所见即所得** · 编辑模式从纯文本框升级为即时渲染编辑器（基于成熟开源编辑器 Vditor，即 2026-05 复盘中指定的路线）。边打字边看到排版效果，Typora 同款体验；也可在编辑器右上角切回纯源码视图
+- **编辑工具栏** · 标题、加粗、斜体、删除线、行内代码、链接、列表（无序/有序/任务）、引用、代码块、表格、撤销/重做，一键可点
+- **编辑模式内直接渲染代码高亮 / 数学公式 / Mermaid 图**
+- 编辑器完整支持 5 语言界面和深浅主题，随应用设置自动切换
+- 完全离线：编辑器全部资源打进安装包，无任何外网依赖
+
+### Fixed
+- 关于弹窗版本号此前停在 1.2.0 不随版本更新；现在自动跟随应用版本
+- 打字后立刻保存 / 关闭标签 / 切换模式时，最后几个字符可能未被计入的时序问题（新编辑器输入回调有防抖，所有读取路径已改为实时拉取）
+
+### Tech
+- 新模块 `vditorEditor.js` 与经典 `editor.js` 同接口，Vditor 启动失败时自动回退纯文本框
+- 全局快捷键改为两段式：应用级命令（Ctrl+E/S/W/T/Tab 等）在捕获阶段抢占，编辑器内建快捷键（Ctrl+B/I/Z 等）不受影响
+- Vditor 运行时资源由 `scripts/copy-vditor-assets.mjs` 从 node_modules 裁剪拷贝（不含乐谱/化学式/脑图等冷门引擎），经 vite publicDir 打包
+- 版本跳过 1.3.x：该段位已被 2026-05 撤回的失败尝试占用（见 postmortem）
+
 ## [1.2.2] — 2026-05-05
 
 ### Reverted

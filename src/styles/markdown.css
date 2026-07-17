@@ -194,3 +194,25 @@
 }
 #editor-input[hidden] { display: none !important; }
 #renderer-output[hidden] { display: none !important; }
+
+/* Editor pane (v1.4) — hosts Vditor, or the classic textarea as fallback */
+#editor-pane { height: 100%; }
+#editor-pane[hidden] { display: none !important; }
+/* Edit mode fills the whole content area; Vditor brings its own chrome */
+.content:has(> #editor-pane:not([hidden])) {
+  padding: 0;
+  overflow: hidden;
+}
+#vditor-root { height: 100%; }
+#vditor-root[hidden] { display: none !important; }
+#vditor-root .vditor {
+  border: none;
+  border-radius: 0;
+  height: 100%;
+}
+/* Follow the app's Ctrl+± zoom (same variable the read view uses) */
+#vditor-root .vditor-reset {
+  font-size: var(--md-font-size, 16px);
+}
+/* Classic textarea keeps the old reading margins now that .content has none */
+#editor-pane #editor-input { padding: 40px 56px 60px 56px; }

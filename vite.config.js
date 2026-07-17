@@ -9,7 +9,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // (separate from ./dist/ which holds final installers).
 export default defineConfig({
   root: path.resolve(__dirname, "src"),
-  publicDir: false,
+  // Static assets staged by scripts/copy-vditor-assets.mjs (vditor's runtime
+  // files, loaded dynamically via its `cdn` option — must ship for offline use)
+  publicDir: path.resolve(__dirname, "public"),
   base: "./",
   build: {
     outDir: path.resolve(__dirname, "build"),

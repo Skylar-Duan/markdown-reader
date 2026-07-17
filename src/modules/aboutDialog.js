@@ -1,6 +1,8 @@
 // aboutDialog.js
 
-const VERSION = "1.2.0";
+import pkg from "../../package.json";
+
+const VERSION = pkg.version;
 
 export class AboutDialog {
   constructor(i18n) {

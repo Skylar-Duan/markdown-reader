@@ -22,7 +22,7 @@ a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 /* Allow selection inside content area */
-#renderer-output, #editor-input, .modal-content {
+#renderer-output, #editor-pane, .modal-content {
   user-select: text;
 }
 

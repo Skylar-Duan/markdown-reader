@@ -36,22 +36,41 @@ function eventToKey(e) {
   return parts.join("+");
 }
 
+// App-level commands that must win even when focus is inside the editor.
+// Handled in the capture phase so Vditor's own element-level hotkey handlers
+// (which may stopPropagation) never see them.
+const APP_PRIORITY_KEYS = new Set([
+  "Ctrl+O", "Ctrl+S", "Ctrl+Shift+S", "Ctrl+P",
+  "Ctrl+W", "Ctrl+T", "Ctrl+Tab", "Ctrl+Shift+Tab", "Ctrl+PageDown", "Ctrl+PageUp",
+  "Ctrl+E", "Ctrl+\\", "F1", "F11"
+]);
+
 export function setupShortcuts(actions) {
-  document.addEventListener("keydown", (e) => {
-    // Don't intercept if focused on textarea/input (let native shortcuts work)
-    // EXCEPT for our specific app shortcuts
-    const key = eventToKey(e);
+  const run = (e, key) => {
     const match = KEY_MAP.find(m => m.keys === key);
-    if (match && actions[match.action]) {
-      // Allow default for editor-specific keys when in edit mode
-      const inEditor = document.activeElement?.tagName === "TEXTAREA" || document.activeElement?.tagName === "INPUT";
-      const editorKeys = ["Ctrl+A", "Ctrl+Z", "Ctrl+Y", "Ctrl+X", "Ctrl+C", "Ctrl+V"];
-      if (inEditor && editorKeys.includes(key)) {
-        // let browser handle native, our shortcut is a no-op route
-        return;
-      }
-      e.preventDefault();
-      actions[match.action]();
-    }
+    if (!match || !actions[match.action]) return false;
+    e.preventDefault();
+    actions[match.action]();
+    return true;
+  };
+
+  // Capture phase: app-critical shortcuts beat any editor-internal handler
+  document.addEventListener("keydown", (e) => {
+    const key = eventToKey(e);
+    if (!APP_PRIORITY_KEYS.has(key)) return;
+    if (run(e, key)) e.stopPropagation();
+  }, true);
+
+  // Bubble phase: everything else (zoom, find, escape…)
+  document.addEventListener("keydown", (e) => {
+    if (e.defaultPrevented) return;  // already handled above / by the editor
+    const key = eventToKey(e);
+    if (APP_PRIORITY_KEYS.has(key)) return;
+    // Let native editing shortcuts work while typing
+    const el = document.activeElement;
+    const inEditor = el?.tagName === "TEXTAREA" || el?.tagName === "INPUT" || el?.isContentEditable;
+    const editorKeys = ["Ctrl+A", "Ctrl+Z", "Ctrl+Y", "Ctrl+X", "Ctrl+C", "Ctrl+V"];
+    if (inEditor && editorKeys.includes(key)) return;
+    run(e, key);
   });
 }

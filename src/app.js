@@ -4,6 +4,7 @@ import { renderMarkdown } from "./modules/renderer.js";
 import { extractTOC, renderTOC, setupScrollSpy } from "./modules/toc.js";
 import { I18n, loadLocales, detectInitialLocale, LOCALE_NAMES, SUPPORTED_LOCALES } from "./modules/i18n.js";
 import { Editor } from "./modules/editor.js";
+import { VditorEditor } from "./modules/vditorEditor.js";
 import { applyMode } from "./modules/modeSwitch.js";
 import { Theme } from "./modules/theme.js";
 import { StatusBar } from "./modules/statusbar.js";
@@ -72,15 +73,29 @@ async function boot() {
   // Theme
   theme = new Theme();
 
-  // Editor
-  editor = new Editor(document.getElementById("editor-input"), (newText) => {
+  // Editor — Vditor (WYSIWYG-style IR editor, v1.4); classic textarea as
+  // automatic fallback if Vditor fails to boot in this webview.
+  const onEditorChange = (newText) => {
     if (!state) return;
     state.rawText = newText;
     state.dirty = true;
     statusBar?.setStats(newText);
     statusBar?.setDirty(true);
     renderTabBar();  // dirty marker on the tab
-  });
+  };
+  const vditorRoot = document.getElementById("vditor-root");
+  const textareaEl = document.getElementById("editor-input");
+  try {
+    const ve = new VditorEditor(vditorRoot, onEditorChange);
+    await ve.init(detectInitialLocale(), theme.effective());
+    editor = ve;
+    textareaEl.hidden = true;
+  } catch (e) {
+    console.warn("Vditor unavailable — using classic editor:", e);
+    vditorRoot.hidden = true;
+    textareaEl.hidden = false;
+    editor = new Editor(textareaEl, onEditorChange);
+  }
 
   // Other modules
   statusBar = new StatusBar(i18n);
@@ -106,8 +121,10 @@ async function boot() {
       renderTabBar();
       updateWindowTitle();
     },
-    getDirty: () => state?.dirty || false,
-    getCurrent: () => state || { filePath: null, rawText: "" }
+    // Pull live editor state first: Vditor's input callback is debounced, so
+    // state.rawText/dirty can lag a few hundred ms behind actual keystrokes.
+    getDirty: () => { persistActiveViewState(); return state?.dirty || false; },
+    getCurrent: () => { persistActiveViewState(); return state || { filePath: null, rawText: "" }; }
   });
 
   // i18n DOM application
@@ -117,6 +134,7 @@ async function boot() {
     statusBar.refresh();
     refreshLangLabel();
     renderTabBar();  // tab labels for "Untitled"
+    editor.setLocale(i18n.currentLocale);  // async for Vditor (recreates UI)
   });
 
   // Plugins
@@ -143,18 +161,18 @@ async function boot() {
     nextTab: () => switchToNeighborTab(+1),
     prevTab: () => switchToNeighborTab(-1),
 
-    undo: () => { if (state?.mode === "edit") document.execCommand("undo"); },
-    redo: () => { if (state?.mode === "edit") document.execCommand("redo"); },
-    cut: () => { if (state?.mode === "edit") document.execCommand("cut"); },
+    undo: () => { if (state?.mode === "edit") editor.execAction("undo"); },
+    redo: () => { if (state?.mode === "edit") editor.execAction("redo"); },
+    cut: () => { if (state?.mode === "edit") editor.execAction("cut"); },
     copy: () => {
       if (state?.mode === "edit") {
-        document.execCommand("copy");
+        editor.execAction("copy");
       } else {
         const sel = window.getSelection().toString();
         if (sel) navigator.clipboard.writeText(sel);
       }
     },
-    paste: () => { if (state?.mode === "edit") document.execCommand("paste"); },
+    paste: () => { if (state?.mode === "edit") editor.execAction("paste"); },
     selectAll: () => {
       if (state?.mode === "edit") {
         editor.selectAll();
@@ -176,7 +194,7 @@ async function boot() {
       app.dataset.sidebar = app.dataset.sidebar === "hidden" ? "" : "hidden";
     },
 
-    setTheme: (t) => { theme.set(t); mermaidPlugin.applyTheme(theme.effective()); rerender(); },
+    setTheme: (t) => { theme.set(t); mermaidPlugin.applyTheme(theme.effective()); editor.setTheme(theme.effective()); rerender(); },
     getTheme: () => theme.mode,
 
     zoomIn: () => zoom.delta(+1),
@@ -273,6 +291,7 @@ async function closeActiveTab() {
     closeWindow();
     return;
   }
+  persistActiveViewState();  // catch edits still inside the input debounce
   // Confirm discard if dirty
   if (cur.dirty) {
     const ok = await fileOps.confirmDiscard();
@@ -339,14 +358,14 @@ async function activateTab(id) {
   // Restore scroll positions + cursor (after layout settles)
   requestAnimationFrame(() => requestAnimationFrame(() => {
     const c = document.getElementById("content");
-    const ta = document.getElementById("editor-input");
     if (state.mode === "read") {
       c.scrollTop = state.contentScrollTop || 0;
     } else {
-      ta.scrollTop = state.editorScrollTop || 0;
-      ta.selectionStart = state.editorSelStart || 0;
-      ta.selectionEnd = state.editorSelEnd || 0;
-      ta.focus();
+      editor.restoreView({
+        scrollTop: state.editorScrollTop || 0,
+        selStart: state.editorSelStart || 0,
+        selEnd: state.editorSelEnd || 0
+      });
     }
   }));
 
@@ -363,12 +382,14 @@ async function activateTab(id) {
 function persistActiveViewState() {
   if (!state) return;
   if (state.mode === "edit") {
-    state.rawText = editor.getText();
-    state.dirty = editor.isDirty();
-    const ta = document.getElementById("editor-input");
-    state.editorScrollTop = ta.scrollTop;
-    state.editorSelStart = ta.selectionStart;
-    state.editorSelEnd = ta.selectionEnd;
+    const newText = editor.getText();
+    // Text comparison catches keystrokes still inside Vditor's input debounce
+    state.dirty = editor.isDirty() || newText !== state.rawText;
+    state.rawText = newText;
+    const vs = editor.getViewState();
+    state.editorScrollTop = vs.scrollTop;
+    state.editorSelStart = vs.selStart;
+    state.editorSelEnd = vs.selEnd;
   }
   state.contentScrollTop = document.getElementById("content").scrollTop;
 }
@@ -495,25 +516,11 @@ async function rerenderActiveTab() {
 // Capture current scroll progress as a 0..1 fraction
 function getScrollProgress() {
   if (!state) return 0;
-  const el = state.mode === "edit"
-    ? document.getElementById("editor-input")
-    : document.getElementById("content");
+  if (state.mode === "edit") return editor.getScrollProgress();
+  const el = document.getElementById("content");
   if (!el) return 0;
   const max = Math.max(0, el.scrollHeight - el.clientHeight);
   return max > 0 ? el.scrollTop / max : 0;
-}
-
-// Set cursor to a character index near the given scroll progress.
-// This prevents focus() from auto-scrolling away from our restored position.
-function syncCursorToProgress(textarea, progress) {
-  const text = textarea.value;
-  if (!text.length) return;
-  const target = Math.floor(text.length * progress);
-  // Snap cursor to start of nearest line (cleaner UX)
-  const before = text.slice(0, target);
-  const lineStart = before.lastIndexOf("\n") + 1;
-  textarea.selectionStart = lineStart;
-  textarea.selectionEnd = lineStart;
 }
 
 async function switchMode(newMode) {
@@ -522,8 +529,9 @@ async function switchMode(newMode) {
 
   if (state.mode === "edit" && newMode === "read") {
     // Edit → Read: pull text from editor, rerender
-    state.rawText = editor.getText();
-    state.dirty = editor.isDirty();
+    const newText = editor.getText();
+    state.dirty = editor.isDirty() || newText !== state.rawText;
+    state.rawText = newText;
     state.mode = newMode;
     applyMode(newMode, i18n);
     statusBar.setMode(newMode);
@@ -536,26 +544,20 @@ async function switchMode(newMode) {
       c.scrollTop = max * progress;
     }));
   } else if (state.mode === "read" && newMode === "edit") {
-    // Read → Edit:
-    //  1. Load text into editor
-    //  2. Place cursor near scroll position (so focus doesn't jump)
-    //  3. Set scrollTop to exact target
-    //  4. Focus
+    // Read → Edit: load text, then land the editor at the same scroll spot.
     editor.setText(state.rawText);
     editor.dirty = state.dirty;
     state.mode = newMode;
     applyMode(newMode, i18n);
     statusBar.setMode(newMode);
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      const ta = document.getElementById("editor-input");
-      syncCursorToProgress(ta, progress);
-      const max = Math.max(0, ta.scrollHeight - ta.clientHeight);
-      ta.scrollTop = max * progress;
-      ta.focus();
+      editor.focus();
+      editor.setScrollProgress(progress);
       // Save these so tab switch later restores
-      state.editorScrollTop = ta.scrollTop;
-      state.editorSelStart = ta.selectionStart;
-      state.editorSelEnd = ta.selectionEnd;
+      const vs = editor.getViewState();
+      state.editorScrollTop = vs.scrollTop;
+      state.editorSelStart = vs.selStart;
+      state.editorSelEnd = vs.selEnd;
     }));
   }
   renderTabBar();
@@ -573,6 +575,7 @@ function setupThemeToggle() {
   document.getElementById("theme-toggle").addEventListener("click", () => {
     theme.cycle();
     mermaidPlugin.applyTheme(theme.effective());
+    editor.setTheme(theme.effective());
     if (state && (state.filePath || !state.isWelcome)) rerender();
   });
 }
@@ -638,6 +641,7 @@ function setupContentClickHandler() {
 
 function setupBeforeUnload() {
   window.addEventListener("beforeunload", (e) => {
+    persistActiveViewState();  // toolbar edits don't fire Vditor's input callback
     if (tabs.some(t => t.dirty)) {
       e.preventDefault();
       e.returnValue = "";
@@ -649,6 +653,10 @@ function setupBeforeUnload() {
 window.__app = {
   get state() { return state; },
   get tabs() { return tabs; },
-  i18n, theme, editor, statusBar, fileOps, rerender,
+  get editor() { return editor; },
+  get theme() { return theme; },
+  get statusBar() { return statusBar; },
+  get fileOps() { return fileOps; },
+  i18n, rerender,
   newEmptyTab, addFileTab, activateTab, removeTab
 };

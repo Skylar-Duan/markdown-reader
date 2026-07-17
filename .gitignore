@@ -9,6 +9,10 @@ src-tauri/target/
 # Frontend build outputs (vite output)
 build/
 
+# Staged vditor runtime assets (regenerated from node_modules by
+# scripts/copy-vditor-assets.mjs on every vite dev/build)
+public/
+
 # Final installers (uploaded to GitHub Releases instead)
 dist/
 

@@ -9,7 +9,9 @@ export function applyMode(mode, i18n) {
   const isEdit = mode === "edit";
 
   document.getElementById("renderer-output").hidden = isEdit;
-  document.getElementById("editor-input").hidden = !isEdit;
+  // editor-pane hosts whichever editor is active (Vditor, or the classic
+  // textarea as fallback) — app.js decides which child is visible.
+  document.getElementById("editor-pane").hidden = !isEdit;
 
   document.getElementById("mode-icon").textContent = MODE_META[mode].icon;
   const label = document.getElementById("mode-label");
