@@ -1,51 +1,66 @@
-# Markdown Reader · Markdown 阅读器
+# Markdown Reader
 
-替代 Windows 记事本，专门为 .md 文件提供漂亮渲染 + 编辑能力的桌面应用。
+Windows 上的 Markdown 阅读 / 编辑器。双击 `.md` 就打开，排版漂亮，`Ctrl+E` 切到所见即所得编辑。
 
-> 状态：**🚧 设计中** —— 详细设计见 [`DESIGN.md`](./DESIGN.md)，UI 风格 mockup 见 [`_design-mockups/ui-styles.html`](./_design-mockups/ui-styles.html)。
+像记事本一样简单，但认识 Markdown。
 
-## 一句话定位
+## 下载
 
-**像记事本一样简单，但能漂亮渲染 .md 格式。**
+到 [Releases](https://github.com/Skylar-Duan/markdown-reader/releases/latest) 下载 `Markdown Reader_x.y.z_x64-setup.exe`，双击安装。
 
-## 核心功能（v1）
+- 装在 `%LOCALAPPDATA%\Programs\`，**不需要管理员权限**
+- 没买代码签名证书，Windows SmartScreen 会提示"未知发布者" → 点 **更多信息** → **仍要运行**
+- 安装时勾选 *Set as default for .md files*，之后双击 `.md` 直接用它打开（也可事后在「文件」菜单里设）
+- 同时提供 5 语言 `.msi`，适合企业批量部署
 
-- 双击 .md 文件即打开（系统级文件关联）
-- 默认渲染态显示（Notion 风），Ctrl+E 一键切换原始文本编辑
-- 五语言界面：简中 / 英 / 日 / 韩 / 繁中
-- 浅 / 深主题，跟随系统或一键切换
-- 左侧大纲（TOC）自动生成
-- 顶部菜单：文件 / 编辑 / 视图 / 帮助
-- 标准快捷键全套（Ctrl+S / C / V / Z / F / P）
-- 代码块语法高亮（Python / JS / Rust 等主流语言）
-- 可选插件：Mermaid 流程图、LaTeX 数学公式
+## 功能
 
-## 不做的（YAGNI）
+**阅读模式**
+- GFM 完整渲染：表格、任务列表、删除线、脚注
+- 30+ 语言代码高亮
+- 左侧大纲自动生成，点击跳转
+- 可选插件：Mermaid 流程图、LaTeX 数学公式（「帮助」菜单里开关）
 
-- 实时多人协作
-- 云同步
-- 文件管理器（只一次打开一个文件）
-- 内置 AI 写作助手
-- WYSIWYG 所见即所得编辑（v1 用模式切换，体验更稳）
+**编辑模式**（`Ctrl+E`）
+- 所见即所得：边打字边看到排版效果
+- 工具栏：标题、加粗、斜体、删除线、行内代码、链接、列表、引用、代码块、表格
+- 也可切换成纯 Markdown 源码视图
 
-## 架构
+**其它**
+- 多标签：一个窗口管所有文件，每个标签独立记住模式 / 滚动位置 / 未保存状态
+- 5 语言界面（简中 / 繁中 / English / 日本語 / 한국어），切换无需重启
+- 浅色 / 深色 / 跟随系统
+- UTF-8 与 GBK 自动识别；大文件保护（5MB 提示，20MB 拒绝）
+- 完全离线运行，无遥测、无联网请求
 
-- **桌面壳**：Tauri（Rust + Windows WebView2）→ 安装包 ~10MB
-- **前端**：HTML + CSS + JS（Notion 风 UI）
-- **渲染**：marked.js + highlight.js
-- **国际化**：JSON 字符串字典 + 运行时切换
+## 快捷键
 
-## 启动方式
-
-**目标形态**：Windows `.msi` 安装包，桌面快捷方式，可设为 .md 默认打开方式。
-
-| 阶段 | 怎么用 |
+| 操作 | 快捷键 |
 |---|---|
-| 开发期 | `pnpm tauri dev` 在本机跑 |
-| 测试期 | `pnpm tauri build` → 装 `.msi` 试用 |
-| 上线 | 测试通过后上传 GitHub Releases，他人下载 .msi 双击安装 |
+| 打开 / 保存 / 另存为 | `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` |
+| 切换阅读 · 编辑 | `Ctrl+E` |
+| 新建 / 关闭标签 | `Ctrl+T` / `Ctrl+W` |
+| 切换标签 | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
+| 查找 | `Ctrl+F` |
+| 显示 / 隐藏大纲 | `Ctrl+\` |
+| 字号 放大 / 缩小 / 重置 | `Ctrl++` / `Ctrl+-` / `Ctrl+0` |
+| 全屏 / 帮助 | `F11` / `F1` |
 
-## 文档
+## 从源码构建
 
-- [`DESIGN.md`](./DESIGN.md) — 完整设计文档（架构 / UI 规范 / i18n / 安装 / 快捷键 / 测试）
-- [`_design-mockups/ui-styles.html`](./_design-mockups/ui-styles.html) — UI 风格对比（已选 Notion 风）
+需要 Node 20+、[pnpm](https://pnpm.io/)、[Rust 工具链](https://rustup.rs/)，以及 WebView2（Win10/11 自带）。
+
+```bash
+pnpm install
+pnpm tauri dev      # 开发模式
+pnpm test           # 单元测试
+pnpm tauri build    # 打安装包 → src-tauri/target/release/bundle/
+```
+
+## 技术栈
+
+Tauri 2（Rust + WebView2）· marked + highlight.js + DOMPurify（渲染）· [Vditor](https://github.com/Vanessa219/vditor)（编辑）· Vite
+
+## 许可
+
+[MIT](./LICENSE)
