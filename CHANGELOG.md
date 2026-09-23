@@ -2,6 +2,13 @@
 
 安装包见 [Releases](https://github.com/Skylar-Duan/markdown-reader/releases)。
 
+## v1.5.0 — 2026-09-23
+
+- 安装向导最后一页新增勾选项「在右键"新建"菜单中添加 Markdown 文档」（默认勾选），右键 → 新建 就能直接建一个空白 `.md`
+- 菜单名称和 `.md` 的文件类型名跟随安装时选的语言（Markdown 文档 / Markdown 文件 / Markdown Document / Markdown ドキュメント / Markdown 문서）
+- 重装、自动更新时保留上次的选择；卸载时一并移除该菜单项
+- `.msi` 安装包默认添加该菜单项
+
 ## v1.4.0 — 2026-07-24
 
 - 编辑模式升级为**所见即所得**，带完整工具栏（标题 / 加粗 / 列表 / 引用 / 代码块 / 表格…），也可切回纯源码视图

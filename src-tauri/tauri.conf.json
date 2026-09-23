@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Markdown Reader",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "identifier": "com.dbwen.mdreader",
   "build": {
     "frontendDist": "../build",
@@ -52,12 +52,15 @@
     ],
     "windows": {
       "wix": {
-        "language": ["en-US", "zh-CN", "zh-TW", "ja-JP", "ko-KR"]
+        "language": ["en-US", "zh-CN", "zh-TW", "ja-JP", "ko-KR"],
+        "fragmentPaths": ["windows/newmenu.wxs"],
+        "componentRefs": ["MdShellNew"]
       },
       "nsis": {
         "displayLanguageSelector": true,
         "languages": ["English", "SimpChinese", "TradChinese", "Japanese", "Korean"],
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "template": "windows/installer.nsi"
       }
     }
   },

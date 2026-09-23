@@ -11,6 +11,7 @@ Windows 上的 Markdown 阅读 / 编辑器。双击 `.md` 就打开，排版漂�
 - 装在 `%LOCALAPPDATA%\Programs\`，**不需要管理员权限**
 - 没买代码签名证书，Windows SmartScreen 会提示"未知发布者" → 点 **更多信息** → **仍要运行**
 - 安装时勾选 *Set as default for .md files*，之后双击 `.md` 直接用它打开（也可事后在「文件」菜单里设）
+- 安装最后一页可勾选「在右键"新建"菜单中添加 Markdown 文档」（默认勾选）
 - 同时提供 5 语言 `.msi`，适合企业批量部署
 
 ## 功能
