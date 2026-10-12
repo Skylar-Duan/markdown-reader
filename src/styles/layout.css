@@ -1,7 +1,7 @@
 .app {
   display: grid;
   grid-template-rows: 38px 36px 1fr 24px;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: var(--sidebar-width, 240px) 1fr;
   grid-template-areas:
     "tabbar   tabbar"
     "menubar  menubar"
@@ -160,7 +160,22 @@
 .app[data-sidebar="hidden"] {
   grid-template-columns: 0 1fr;
 }
-.app[data-sidebar="hidden"] .sidebar { display: none; }
+.app[data-sidebar="hidden"] .sidebar,
+.app[data-sidebar="hidden"] .sidebar-resizer { display: none; }
+
+/* Drag handle on the outline's right edge */
+.sidebar-resizer {
+  grid-area: sidebar;
+  justify-self: end;
+  width: 6px;
+  margin-right: -3px;
+  z-index: 5;
+  cursor: col-resize;
+  touch-action: none;
+}
+.sidebar-resizer:hover,
+body.resizing-sidebar .sidebar-resizer { background: var(--border); }
+body.resizing-sidebar { cursor: col-resize; user-select: none; }
 
 /* ── Badges (top-right buttons) ── */
 .badge {

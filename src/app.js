@@ -12,6 +12,7 @@ import { setupShortcuts } from "./modules/shortcuts.js";
 import { Search } from "./modules/search.js";
 import { setupMenus } from "./modules/menu.js";
 import { Zoom } from "./modules/zoom.js";
+import { setupSidebarResize } from "./modules/sidebarResize.js";
 import { FileOps } from "./modules/fileOps.js";
 import { renderWelcome } from "./modules/welcomeScreen.js";
 import { AboutDialog } from "./modules/aboutDialog.js";
@@ -239,6 +240,7 @@ async function boot() {
   await fileOps.setupCliArgs();
 
   setupScrollSpy(document.getElementById("content"), document.getElementById("toc"));
+  setupSidebarResize(document.getElementById("sidebar-resizer"), document.getElementById("sidebar"));
 }
 
 async function setupTauriOpenFileEvent() {
