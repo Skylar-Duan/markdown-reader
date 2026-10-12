@@ -1,7 +1,7 @@
 // sidebarResize.js — drag the outline's right edge to change its width
 
 const KEY = "md-reader.sidebarWidth";
-const MIN = 160;
+const MIN = 80;
 const MAX = 600;
 const DEFAULT = 240;
 
