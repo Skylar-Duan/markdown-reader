@@ -20,6 +20,9 @@ import { HelpDialog } from "./modules/helpDialog.js";
 import * as mermaidPlugin from "./modules/plugins/mermaid.js";
 import * as katexPlugin from "./modules/plugins/katex.js";
 import { toast } from "./modules/toast.js";
+import { setupTabReorder } from "./modules/tabReorder.js";
+import { readSession, writeSession, normalizePath } from "./modules/session.js";
+import { askRestoreSession } from "./modules/restoreDialog.js";
 
 // External link routing through Tauri shell (lazy)
 const openExternalUrl = (url) => {
@@ -62,11 +65,16 @@ let fileOps;
 let aboutDialog;
 let helpDialog;
 let langPickerEl;
+let sessionReady = false;
+let activeViewReady = false;
+let viewRevision = 0;
 
 // ── Boot ──────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", boot);
 
 async function boot() {
+  // Read before creating the welcome tab: boot must not overwrite the last session.
+  const previousSession = readSession();
   // Locales
   i18n.locales = await loadLocales();
   i18n.setLocale(detectInitialLocale());
@@ -80,6 +88,7 @@ async function boot() {
     if (!state) return;
     state.rawText = newText;
     state.dirty = true;
+    if (newText) state.isWelcome = false;
     statusBar?.setStats(newText);
     statusBar?.setDirty(true);
     renderTabBar();  // dirty marker on the tab
@@ -110,7 +119,7 @@ async function boot() {
     i18n,
     onLoaded: ({ path, content, encoding }) => {
       // Open in a new tab (or replace empty welcome)
-      addFileTab(path, content, encoding);
+      return addFileTab(path, content, encoding);
     },
     onSaved: (newPath) => {
       if (!state) return;
@@ -233,11 +242,54 @@ async function boot() {
   fileOps.setupDragDrop();
 
   // Tauri event: secondary launches route here to open in new tab
-  setupTauriOpenFileEvent();
+  await setupTauriOpenFileEvent();
 
   // Initial state: 1 welcome tab, then maybe load CLI arg into it
-  newEmptyTab();
+  await newEmptyTab();
   await fileOps.setupCliArgs();
+
+  if (previousSession && await askRestoreSession(i18n, previousSession)) {
+    // A file explicitly opened from Explorer takes priority over the old active tab.
+    const requestedTab = state?.filePath ? state : null;
+    const restored = [];
+    const views = new Map();
+    let failed = 0;
+    for (const saved of previousSession.tabs) {
+      let tab = tabs.find(t => t.filePath && normalizePath(t.filePath) === normalizePath(saved.filePath));
+      if (!tab) {
+        const opened = await fileOps.open(saved.filePath, { restoring: true });
+        if (!opened) { failed++; continue; }
+        tab = tabs.find(t => t.filePath && normalizePath(t.filePath) === normalizePath(saved.filePath));
+      }
+      if (tab) {
+        views.set(tab, saved);
+        restored.push(tab);
+      }
+    }
+    // Keep the previous visual order, then any explicitly requested new file.
+    const extra = tabs.filter(t => !restored.includes(t) && !t.isWelcome);
+    if (restored.length) tabs.splice(0, tabs.length, ...restored, ...extra);
+    const savedActive = previousSession.tabs[previousSession.activeIndex];
+    const target = requestedTab || restored.find(t => normalizePath(t.filePath) === normalizePath(savedActive?.filePath || "")) || restored[0];
+    if (target) {
+      // All reads are finished before applying old view state. Otherwise loading
+      // the next file would persist the editor over a restored tab's positions.
+      for (const [tab, saved] of views) Object.assign(tab, saved);
+      state = null;
+      await activateTab(target.id);
+    }
+    if (failed) toast(i18n.t("session.unavailable", { count: failed }), "warning");
+  }
+  sessionReady = true;
+  saveSession();
+
+  // Reading position changes do not redraw the tab bar. Keep those too, without
+  // storing document content or doing storage writes for every scroll event.
+  let sessionTimer;
+  document.getElementById("content").addEventListener("scroll", () => {
+    clearTimeout(sessionTimer);
+    sessionTimer = setTimeout(saveSession, 250);
+  }, { passive: true });
 
   setupScrollSpy(document.getElementById("content"), document.getElementById("toc"));
   setupSidebarResize(document.getElementById("sidebar-resizer"), document.getElementById("sidebar"));
@@ -261,10 +313,11 @@ async function setupTauriOpenFileEvent() {
 function newEmptyTab() {
   const t = makeTab();
   tabs.push(t);
-  activateTab(t.id);
+  return activateTab(t.id);
 }
 
 function addFileTab(path, content, encoding) {
+  persistActiveViewState();
   // If active tab is an untouched welcome tab, replace it instead of adding
   const cur = activeTab();
   if (cur && cur.isWelcome && !cur.dirty && !cur.filePath) {
@@ -278,13 +331,12 @@ function addFileTab(path, content, encoding) {
     cur.editorScrollTop = 0;
     cur.editorSelStart = 0;
     cur.editorSelEnd = 0;
-    rerenderActiveTab();
-    return;
+    return rerenderActiveTab();
   }
   const t = makeTab({ filePath: path, rawText: content, encoding });
   t.isWelcome = false;
   tabs.push(t);
-  activateTab(t.id);
+  return activateTab(t.id);
 }
 
 async function closeActiveTab() {
@@ -306,7 +358,11 @@ function removeTab(id) {
   const idx = tabs.findIndex(t => t.id === id);
   if (idx === -1) return;
   tabs.splice(idx, 1);
+  // Closing an inactive tab must not switch away from the document being read.
+  if (state?.id !== id) { renderTabBar(); return; }
   if (tabs.length === 0) {
+    state = null;
+    saveSession();
     closeWindow();
     return;
   }
@@ -333,6 +389,7 @@ function switchToNeighborTab(direction) {
 
 // Save outgoing tab's UI state, switch to the new tab, restore its state.
 async function activateTab(id) {
+  const revision = ++viewRevision;
   // Save outgoing tab's view state
   if (state) {
     persistActiveViewState();
@@ -340,6 +397,7 @@ async function activateTab(id) {
 
   const t = tabs.find(x => x.id === id);
   if (!t) return;
+  activeViewReady = false;
   state = t;
 
   // Apply mode (which view is visible)
@@ -358,18 +416,21 @@ async function activateTab(id) {
   }
 
   // Restore scroll positions + cursor (after layout settles)
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  if (state !== t || revision !== viewRevision) return;
+  {
     const c = document.getElementById("content");
-    if (state.mode === "read") {
-      c.scrollTop = state.contentScrollTop || 0;
+    if (t.mode === "read") {
+      c.scrollTop = t.contentScrollTop || 0;
     } else {
       editor.restoreView({
-        scrollTop: state.editorScrollTop || 0,
-        selStart: state.editorSelStart || 0,
-        selEnd: state.editorSelEnd || 0
+        scrollTop: t.editorScrollTop || 0,
+        selStart: t.editorSelStart || 0,
+        selEnd: t.editorSelEnd || 0
       });
     }
-  }));
+  }
+  activeViewReady = true;
 
   // Status bar / window title / tab bar UI
   statusBar.setPath(state.filePath);
@@ -382,12 +443,13 @@ async function activateTab(id) {
 }
 
 function persistActiveViewState() {
-  if (!state) return;
+  if (!state || !activeViewReady) return;
   if (state.mode === "edit") {
     const newText = editor.getText();
     // Text comparison catches keystrokes still inside Vditor's input debounce
-    state.dirty = editor.isDirty() || newText !== state.rawText;
+    state.dirty = state.dirty || editor.isDirty() || newText !== state.rawText;
     state.rawText = newText;
+    if (newText) state.isWelcome = false;
     const vs = editor.getViewState();
     state.editorScrollTop = vs.scrollTop;
     state.editorSelStart = vs.selStart;
@@ -399,6 +461,14 @@ function persistActiveViewState() {
 // ── Tab bar UI ────────────────────────────────────────────────────────────
 function setupTabBar() {
   document.getElementById("tab-new").addEventListener("click", () => newEmptyTab());
+  setupTabReorder(document.getElementById("tab-list"), {
+    onReorder: (ids) => {
+      const byId = new Map(tabs.map(tab => [tab.id, tab]));
+      if (ids.length !== tabs.length || new Set(ids).size !== tabs.length || ids.some(id => !byId.has(id))) return;
+      tabs.splice(0, tabs.length, ...ids.map(id => byId.get(id)));
+      saveSession();
+    }
+  });
 }
 
 function renderTabBar() {
@@ -462,6 +532,13 @@ function renderTabBar() {
 
     container.appendChild(li);
   }
+  saveSession();
+}
+
+function saveSession() {
+  if (!sessionReady) return;
+  persistActiveViewState();
+  writeSession(tabs, state?.id);
 }
 
 function updateWindowTitle() {
@@ -532,7 +609,7 @@ async function switchMode(newMode) {
   if (state.mode === "edit" && newMode === "read") {
     // Edit → Read: pull text from editor, rerender
     const newText = editor.getText();
-    state.dirty = editor.isDirty() || newText !== state.rawText;
+    state.dirty = state.dirty || editor.isDirty() || newText !== state.rawText;
     state.rawText = newText;
     state.mode = newMode;
     applyMode(newMode, i18n);
@@ -644,6 +721,7 @@ function setupContentClickHandler() {
 function setupBeforeUnload() {
   window.addEventListener("beforeunload", (e) => {
     persistActiveViewState();  // toolbar edits don't fire Vditor's input callback
+    saveSession();
     if (tabs.some(t => t.dirty)) {
       e.preventDefault();
       e.returnValue = "";

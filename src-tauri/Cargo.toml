@@ -1,6 +1,6 @@
 [package]
 name = "markdown-reader"
-version = "1.5.1"
+version = "1.6.0"
 description = "A simple, beautiful Markdown reader for Windows"
 authors = ["dbwen"]
 license = "MIT"

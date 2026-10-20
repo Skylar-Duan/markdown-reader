@@ -1,4 +1,11 @@
 {
+  "session.eyebrow": "继续阅读",
+  "session.title": "回到上次的阅读？",
+  "session.description": "上次还有 {count} 份文档打开着，要从那里继续吗？",
+  "session.restore": "恢复文档",
+  "session.fresh": "开始新会话",
+  "session.summary": "保留标签顺序与阅读位置，重新读取文件中已保存的内容。",
+  "session.unavailable": "有 {count} 份文档无法恢复，可能已移动、删除或无法读取。",
   "menu.file": "文件",
   "menu.edit": "编辑",
   "menu.view": "视图",

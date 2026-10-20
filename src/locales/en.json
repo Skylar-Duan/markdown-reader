@@ -1,4 +1,11 @@
 {
+  "session.eyebrow": "CONTINUE READING",
+  "session.title": "Pick up where you left off?",
+  "session.description": "You left {count} documents open. Ready to return to them?",
+  "session.restore": "Restore documents",
+  "session.fresh": "Start fresh",
+  "session.summary": "Keep your tab order and reading position. Documents reopen from their saved files.",
+  "session.unavailable": "Could not restore {count} documents. They may have moved, been deleted, or become unreadable.",
   "menu.file": "File",
   "menu.edit": "Edit",
   "menu.view": "View",

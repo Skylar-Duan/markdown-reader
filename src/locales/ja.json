@@ -1,4 +1,11 @@
 {
+  "session.eyebrow": "読書を続ける",
+  "session.title": "前回の続きから読みますか？",
+  "session.description": "前回は {count} 件の文書を開いていました。復元しますか？",
+  "session.restore": "文書を復元",
+  "session.fresh": "新しく始める",
+  "session.summary": "タブの順序と読書位置を維持し、保存済みのファイルを開き直します。",
+  "session.unavailable": "{count} 件の文書を復元できませんでした。移動、削除、またはアクセスできない可能性があります。",
   "menu.file": "ファイル",
   "menu.edit": "編集",
   "menu.view": "表示",

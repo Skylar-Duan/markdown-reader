@@ -1,4 +1,11 @@
 {
+  "session.eyebrow": "繼續閱讀",
+  "session.title": "回到上次的閱讀？",
+  "session.description": "上次還有 {count} 份文件開啟著，要從那裡繼續嗎？",
+  "session.restore": "恢復文件",
+  "session.fresh": "開始新工作階段",
+  "session.summary": "保留分頁順序與閱讀位置，重新讀取檔案中已儲存的內容。",
+  "session.unavailable": "有 {count} 份文件無法恢復，可能已移動、刪除或無法讀取。",
   "menu.file": "檔案",
   "menu.edit": "編輯",
   "menu.view": "檢視",

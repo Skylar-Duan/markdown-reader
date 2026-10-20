@@ -27,3 +27,8 @@ Thumbs.db
 # Logs / temp
 *.log
 .tmp/
+
+# Local delivery artifacts
+安装包/
+交付验收/
+界面截图/

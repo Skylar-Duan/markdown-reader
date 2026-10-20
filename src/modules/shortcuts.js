@@ -47,6 +47,8 @@ const APP_PRIORITY_KEYS = new Set([
 
 export function setupShortcuts(actions) {
   const run = (e, key) => {
+    // Native modal focus is isolated, and app shortcuts must respect that too.
+    if (document.querySelector("dialog[open]")) return false;
     const match = KEY_MAP.find(m => m.keys === key);
     if (!match || !actions[match.action]) return false;
     e.preventDefault();

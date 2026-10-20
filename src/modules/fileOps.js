@@ -48,12 +48,8 @@ export class FileOps {
     }
   }
 
-  async open(path) {
-    if (!await this.confirmDiscard()) {
-      this.onConfirmDiscardCancelled?.();
-      return;
-    }
-
+  async open(path, { restoring = false } = {}) {
+    // Files open in their own tab; no current edits are discarded by opening one.
     if (!path) {
       try {
         const selected = await openDialog({
@@ -71,8 +67,8 @@ export class FileOps {
     try {
       const exists = await invoke("file_exists", { path });
       if (!exists) {
-        toast(this.i18n.t("toast.file_not_found"), "error");
-        return;
+        if (!restoring) toast(this.i18n.t("toast.file_not_found"), "error");
+        return false;
       }
 
       const size = await invoke("file_size", { path });
@@ -97,11 +93,13 @@ export class FileOps {
       }
 
       const result = await invoke("read_file", { path });
-      this.onLoaded?.({ path, content: result.content, encoding: result.encoding });
+      await this.onLoaded?.({ path, content: result.content, encoding: result.encoding });
       this.addRecent(path);
+      return true;
     } catch (e) {
       console.error("read file error", e);
-      toast(String(e), "error");
+      if (!restoring) toast(String(e), "error");
+      return false;
     }
   }
 
