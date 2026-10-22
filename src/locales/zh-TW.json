@@ -1,4 +1,7 @@
 {
+  "menu.file.new_window": "新增視窗",
+  "tab.move_window": "移到新視窗",
+  "tab.transfer_failed": "分頁移動未完成，原文件已保留。",
   "session.eyebrow": "繼續閱讀",
   "session.title": "回到上次的閱讀？",
   "session.description": "上次還有 {count} 份文件開啟著，要從那裡繼續嗎？",

@@ -1,0 +1,110 @@
+/* Tab drag feedback is isolated so the app can load it without changing tab layout. */
+.tabs {
+  position: relative;
+}
+
+.tab.tab-drag-placeholder {
+  opacity: 0.16;
+  border: 1px dashed var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.tab.tab-dragging {
+  cursor: grabbing;
+}
+
+.tab-moving {
+  opacity: 0.32;
+  filter: saturate(0.65);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  transition: opacity 140ms ease, filter 140ms ease, border-color 140ms ease;
+}
+
+.tab-drop-marker {
+  position: fixed;
+  z-index: 2147482000;
+  width: 3px;
+  border-radius: 99px;
+  pointer-events: none;
+  background: linear-gradient(180deg, #8bd4ff 0%, #3b9cff 48%, #1677ff 100%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 38%),
+              0 0 8px 2px rgb(42 142 255 / 65%),
+              0 0 18px 5px rgb(42 142 255 / 32%);
+  transform: translateX(-50%);
+  animation: tab-drop-marker-in 130ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.tab-drop-marker::before {
+  content: "";
+  position: absolute;
+  inset: -5px -4px;
+  border-radius: inherit;
+  background: rgb(59 156 255 / 25%);
+  filter: blur(5px);
+}
+
+@keyframes tab-drop-marker-in {
+  from { opacity: 0; transform: translateX(-50%) scaleY(0.62); }
+  to { opacity: 1; transform: translateX(-50%) scaleY(1); }
+}
+
+.tab.tab-reorder-flip {
+  transition: transform 170ms cubic-bezier(0.2, 0.75, 0.25, 1);
+  will-change: transform;
+}
+
+.tab-drag-ghost {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  padding: 0 8px 0 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--border));
+  border-bottom: none;
+  border-radius: 7px 7px 4px 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  opacity: 0.97;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 24%), 0 3px 8px rgb(0 0 0 / 14%);
+  transform: scale(1.025) rotate(-0.6deg);
+  will-change: left, top, transform;
+}
+
+.tab-drag-ghost .tab-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-drag-ghost .tab-dirty {
+  flex: 0 0 auto;
+}
+
+.tab-drag-ghost-settling {
+  transition: left 180ms cubic-bezier(0.2, 0.75, 0.25, 1),
+              top 180ms cubic-bezier(0.2, 0.75, 0.25, 1),
+              width 180ms ease, height 180ms ease,
+              opacity 180ms ease, transform 180ms ease;
+  transform: scale(1) rotate(0);
+  opacity: 0.25;
+}
+
+.tab-drag-ghost-dismiss {
+  transition: opacity 160ms ease-out, transform 160ms ease-out;
+  transform: scale(0.92) rotate(1deg);
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab.tab-reorder-flip,
+  .tab-drag-ghost,
+  .tab-drag-ghost-settling,
+  .tab-drag-ghost-dismiss,
+  .tab-drop-marker {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

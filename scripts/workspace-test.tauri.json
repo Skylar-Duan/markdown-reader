@@ -1,0 +1,17 @@
+{
+  "identifier": "com.dbwen.mdreader.workspace-check",
+  "build": { "beforeBuildCommand": "" },
+  "app": {
+    "windows": [{
+      "label": "main",
+      "title": "MD Reader verification",
+      "width": 1100,
+      "height": 760,
+      "minWidth": 600,
+      "minHeight": 400,
+      "visible": false,
+      "focus": false,
+      "dragDropEnabled": true
+    }]
+  }
+}

@@ -4,6 +4,7 @@ export function buildMenuConfig(actions) {
   return {
     file: [
       { i18n: "menu.file.new_tab", shortcut: "Ctrl+T", action: () => actions.newTab() },
+      { i18n: "menu.file.new_window", shortcut: "Ctrl+Shift+N", action: () => actions.newWindow?.() },
       { i18n: "menu.file.open", shortcut: "Ctrl+O", action: () => actions.open() },
       { type: "separator" },
       { i18n: "menu.file.save", shortcut: "Ctrl+S", action: () => actions.save() },

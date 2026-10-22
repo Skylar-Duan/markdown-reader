@@ -1,4 +1,7 @@
 {
+  "menu.file.new_window": "새 창",
+  "tab.move_window": "새 창으로 이동",
+  "tab.transfer_failed": "탭을 이동하지 못했습니다. 원래 문서는 그대로 열려 있습니다.",
   "session.eyebrow": "이어서 읽기",
   "session.title": "읽던 곳으로 돌아갈까요?",
   "session.description": "지난번에 문서 {count}개를 열어 두었습니다. 이어서 읽으시겠어요?",

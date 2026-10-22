@@ -7,6 +7,7 @@ const KEY_MAP = [
   { keys: "Ctrl+P", action: "print" },
   { keys: "Ctrl+W", action: "close" },
   { keys: "Ctrl+T", action: "newTab" },
+  { keys: "Ctrl+Shift+N", action: "newWindow" },
   { keys: "Ctrl+Tab", action: "nextTab" },
   { keys: "Ctrl+Shift+Tab", action: "prevTab" },
   { keys: "Ctrl+PageDown", action: "nextTab" },
@@ -41,7 +42,7 @@ function eventToKey(e) {
 // (which may stopPropagation) never see them.
 const APP_PRIORITY_KEYS = new Set([
   "Ctrl+O", "Ctrl+S", "Ctrl+Shift+S", "Ctrl+P",
-  "Ctrl+W", "Ctrl+T", "Ctrl+Tab", "Ctrl+Shift+Tab", "Ctrl+PageDown", "Ctrl+PageUp",
+  "Ctrl+W", "Ctrl+T", "Ctrl+Shift+N", "Ctrl+Tab", "Ctrl+Shift+Tab", "Ctrl+PageDown", "Ctrl+PageUp",
   "Ctrl+E", "Ctrl+\\", "F1", "F11"
 ]);
 

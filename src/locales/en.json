@@ -1,4 +1,7 @@
 {
+  "menu.file.new_window": "New window",
+  "tab.move_window": "Move to new window",
+  "tab.transfer_failed": "The tab could not be moved. Your original document is still open.",
   "session.eyebrow": "CONTINUE READING",
   "session.title": "Pick up where you left off?",
   "session.description": "You left {count} documents open. Ready to return to them?",

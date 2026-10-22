@@ -1,4 +1,7 @@
 {
+  "menu.file.new_window": "新しいウィンドウ",
+  "tab.move_window": "新しいウィンドウに移動",
+  "tab.transfer_failed": "タブを移動できませんでした。元の文書は開いたままです。",
   "session.eyebrow": "読書を続ける",
   "session.title": "前回の続きから読みますか？",
   "session.description": "前回は {count} 件の文書を開いていました。復元しますか？",

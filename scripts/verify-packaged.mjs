@@ -1,3 +1,6 @@
+// Historical 2026-10-20 checks: reload-based restore expectations predate the
+// 2026-10-22 process-level workspace lifecycle. Use verify-workspace.mjs for the
+// current cold-start / secondary-open / multi-window regression check.
 // Run against the installed app launched with a separate WEBVIEW2_USER_DATA_FOLDER
 // and WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333.
 // Uses 02's existing Playwright tooling; never run against the user's real profile.

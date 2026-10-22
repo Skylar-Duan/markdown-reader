@@ -23,6 +23,8 @@ import { toast } from "./modules/toast.js";
 import { setupTabReorder } from "./modules/tabReorder.js";
 import { readSession, writeSession, normalizePath } from "./modules/session.js";
 import { askRestoreSession } from "./modules/restoreDialog.js";
+import { connectWorkspace } from "./modules/workspaceBridge.js";
+import { createWindowSession } from "./modules/windowSession.js";
 
 // External link routing through Tauri shell (lazy)
 const openExternalUrl = (url) => {
@@ -68,13 +70,50 @@ let langPickerEl;
 let sessionReady = false;
 let activeViewReady = false;
 let viewRevision = 0;
+let workspace;
+let windowSession;
+let drainingRequests = false;
+let drainAgain = false;
+let closingWindow = false;
+let previewBusy = false;
+const receivingTransfers = new Set();
+const movingTabs = new Set();
+const transferWaiters = new Map();
 
 // ── Boot ──────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", boot);
 
 async function boot() {
+  workspace = await connectWorkspace({
+    onFiles: () => drainWorkspace(),
+    onTransfers: () => drainWorkspace(),
+    onCommitted: ({ sourceTabId, token }) => {
+      const waiter = transferWaiters.get(sourceTabId);
+      if (!waiter || (waiter.token && waiter.token !== token)) return;
+      transferWaiters.delete(sourceTabId);
+      waiter?.(true);
+      movingTabs.delete(sourceTabId);
+      removeTab(sourceTabId);
+    },
+    onFailed: ({ sourceTabId, token }) => {
+      const waiter = transferWaiters.get(sourceTabId);
+      if (!waiter || (waiter.token && waiter.token !== token)) return;
+      transferWaiters.delete(sourceTabId);
+      movingTabs.delete(sourceTabId);
+      if (state?.id === sourceTabId) document.getElementById("content").inert = false;
+      renderTabBar();
+      waiter?.(false);
+    },
+    onWindowClosed: label => windowSession?.remove(label),
+    onDropPreview: preview => showDropPreview(preview?.clientX),
+  });
+  if (workspace) await workspace.window.onCloseRequested(event => {
+    event.preventDefault();
+    requestWindowClose();
+  });
   // Read before creating the welcome tab: boot must not overwrite the last session.
-  const previousSession = readSession();
+  const previousSession = !workspace || workspace.bootstrap.restore ? readSession() : null;
+  if (workspace) windowSession = createWindowSession(workspace.label, workspace.bootstrap.restore);
   // Locales
   i18n.locales = await loadLocales();
   i18n.setLocale(detectInitialLocale());
@@ -168,6 +207,7 @@ async function boot() {
     setDefault: () => fileOps.setAsDefaultMd(),
     close: () => closeActiveTab(),
     newTab: () => newEmptyTab(),
+    newWindow: () => workspace?.newWindow(),
     nextTab: () => switchToNeighborTab(+1),
     prevTab: () => switchToNeighborTab(-1),
 
@@ -241,12 +281,11 @@ async function boot() {
 
   fileOps.setupDragDrop();
 
-  // Tauri event: secondary launches route here to open in new tab
-  await setupTauriOpenFileEvent();
-
   // Initial state: 1 welcome tab, then maybe load CLI arg into it
   await newEmptyTab();
-  await fileOps.setupCliArgs();
+  if (workspace) {
+    for (const path of workspace.bootstrap.paths) await openRequestedFile(path);
+  } else await fileOps.setupCliArgs();
 
   if (previousSession && await askRestoreSession(i18n, previousSession)) {
     // A file explicitly opened from Explorer takes priority over the old active tab.
@@ -282,6 +321,8 @@ async function boot() {
   }
   sessionReady = true;
   saveSession();
+  for (const transfer of workspace?.bootstrap.transfers || []) await receiveTab(transfer);
+  await drainWorkspace();
 
   // Reading position changes do not redraw the tab bar. Keep those too, without
   // storing document content or doing storage writes for every scroll event.
@@ -295,17 +336,110 @@ async function boot() {
   setupSidebarResize(document.getElementById("sidebar-resizer"), document.getElementById("sidebar"));
 }
 
-async function setupTauriOpenFileEvent() {
+async function openRequestedFile(path) {
+  const existing = tabs.find(t => t.filePath && normalizePath(t.filePath) === normalizePath(path));
+  if (existing) await activateTab(existing.id);
+  else await fileOps.open(path);
+}
+
+async function drainWorkspace() {
+  if (!workspace || !sessionReady || closingWindow) return;
+  drainAgain = true;
+  if (drainingRequests) return;
+  drainingRequests = true;
   try {
-    const { listen } = await import("@tauri-apps/api/event");
-    await listen("open-file-in-tab", async (event) => {
-      const path = event.payload;
-      if (typeof path === "string" && path.length > 0) {
-        await fileOps.open(path);  // → onLoaded → addFileTab
+    while (drainAgain) {
+      drainAgain = false;
+      for (const path of await workspace.takeFiles()) await openRequestedFile(path);
+      for (const transfer of await workspace.takeTransfers()) await receiveTab(transfer);
+    }
+  } finally { drainingRequests = false; }
+}
+
+async function receiveTab(transfer) {
+  if (receivingTransfers.has(transfer.token)) return;
+  receivingTransfers.add(transfer.token);
+  const payload = transfer.payload;
+  persistActiveViewState();
+  const t = makeTab({ filePath: payload.filePath, rawText: payload.rawText, encoding: payload.encoding });
+  for (const key of ["mode", "dirty", "isWelcome", "contentScrollTop", "editorScrollTop", "editorSelStart", "editorSelEnd"]) {
+    if (payload[key] !== undefined) t[key] = payload[key];
+  }
+  if (tabs.length === 1 && state?.isWelcome && !state.dirty) { tabs.splice(0); state = null; }
+  const index = Number.isInteger(transfer.index) ? transfer.index : dropIndex(payload.dropClientX);
+  tabs.splice(Math.max(0, Math.min(index, tabs.length)), 0, t);
+  await activateTab(t.id);
+  let accepted;
+  try { accepted = await workspace.acknowledge(transfer.token); }
+  catch {
+    try { accepted = await workspace.acknowledge(transfer.token); }
+    catch { toast(i18n.t("tab.transfer_failed"), "warning"); }
+  }
+  if (accepted === false) {
+    // The source remains intact unless this acknowledgment succeeds.
+    removeTab(t.id);
+    toast(i18n.t("tab.transfer_failed"), "warning");
+  }
+  showDropPreview(null);
+}
+
+function dropIndex(clientX) {
+  if (typeof clientX !== "number") return tabs.length;
+  const elements = [...document.querySelectorAll("#tab-list .tab")];
+  const index = elements.findIndex(el => { const r = el.getBoundingClientRect(); return clientX < r.left + r.width / 2; });
+  return index < 0 ? tabs.length : index;
+}
+
+function showDropPreview(clientX) {
+  document.querySelector(".tab-drop-marker")?.remove();
+  if (typeof clientX !== "number") return;
+  const elements = [...document.querySelectorAll("#tab-list .tab")];
+  const index = dropIndex(clientX);
+  const anchor = elements[index];
+  const rect = (anchor || elements.at(-1) || document.getElementById("tab-list")).getBoundingClientRect();
+  const marker = document.createElement("div");
+  marker.className = "tab-drop-marker";
+  marker.style.left = `${anchor ? rect.left : rect.right}px`;
+  marker.style.top = `${rect.top + 4}px`;
+  marker.style.height = `${Math.max(20, rect.height - 8)}px`;
+  document.body.appendChild(marker);
+}
+
+async function moveTabToWindow(tabId, target = null, clientX = null) {
+  if (!workspace || movingTabs.has(tabId)) return false;
+  persistActiveViewState();
+  const tab = tabs.find(t => t.id === tabId);
+  if (!tab) return false;
+  movingTabs.add(tabId);
+  if (state?.id === tabId) document.getElementById("content").inert = true;
+  renderTabBar();
+  let timer;
+  const acknowledged = new Promise(resolve => transferWaiters.set(tabId, value => { clearTimeout(timer); resolve(value); }));
+  try {
+    const transfer = await workspace.transfer({ ...tab, sourceTabId: tabId, dropClientX: clientX }, target);
+    const waiter = transferWaiters.get(tabId);
+    if (waiter) waiter.token = transfer.token;
+    if (transferWaiters.has(tabId)) timer = setTimeout(async () => {
+      // Cancel and ACK serialize on the native transaction lock. If ACK already
+      // won, its commit event remains authoritative; otherwise the source stays.
+      if (await workspace.cancelTransfer(transfer.token)) {
+        transferWaiters.get(tabId)?.(false);
+        transferWaiters.delete(tabId);
+        movingTabs.delete(tabId);
+        document.getElementById("content").inert = false;
+        renderTabBar();
       }
-    });
-  } catch (e) {
-    console.warn("Tauri event listen failed:", e);
+    }, 30000);
+    return await acknowledged;
+  } catch (error) {
+    transferWaiters.get(tabId)?.(false);
+    transferWaiters.delete(tabId);
+    movingTabs.delete(tabId);
+    document.getElementById("content").inert = false;
+    renderTabBar();
+    toast(i18n.t("tab.transfer_failed"), "warning");
+    console.error(error);
+    return false;
   }
 }
 
@@ -341,6 +475,7 @@ function addFileTab(path, content, encoding) {
 
 async function closeActiveTab() {
   const cur = activeTab();
+  if (cur && movingTabs.has(cur.id)) return;
   if (!cur) {
     closeWindow();
     return;
@@ -372,6 +507,7 @@ function removeTab(id) {
 }
 
 async function closeWindow() {
+  if (workspace) return requestWindowClose();
   try {
     const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
     await getCurrentWebviewWindow().close();
@@ -385,6 +521,27 @@ function switchToNeighborTab(direction) {
   const idx = tabs.findIndex(t => t.id === state?.id);
   const next = (idx + direction + tabs.length) % tabs.length;
   activateTab(tabs[next].id);
+}
+
+async function requestWindowClose() {
+  if (closingWindow || movingTabs.size) return;
+  closingWindow = true;
+  try {
+    persistActiveViewState();
+    for (const tab of tabs.filter(t => t.dirty)) {
+      await activateTab(tab.id);
+      if (!await fileOps.confirmDiscard()) {
+        closingWindow = false;
+        drainWorkspace();
+        return;
+      }
+    }
+    saveSession();
+    await workspace.window.destroy();
+  } catch (error) {
+    closingWindow = false;
+    console.error("close window failed", error);
+  }
 }
 
 // Save outgoing tab's UI state, switch to the new tab, restore its state.
@@ -406,6 +563,7 @@ async function activateTab(id) {
   // Set editor text & dirty flag (always, so undo history matches per-tab content)
   editor.setText(state.rawText);
   editor.dirty = state.dirty;
+  document.getElementById("content").inert = movingTabs.has(t.id);
 
   // Render content (or welcome) for this tab
   if (state.isWelcome && !state.filePath) {
@@ -415,8 +573,14 @@ async function activateTab(id) {
     await rerender();
   }
 
-  // Restore scroll positions + cursor (after layout settles)
-  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  // Covered WebView2 windows may suspend frames; opening files must still finish.
+  updateWindowTitle();
+  await new Promise(resolve => {
+    let complete = false;
+    const done = () => { if (!complete) { complete = true; clearTimeout(timer); resolve(); } };
+    const timer = setTimeout(done, 70);
+    requestAnimationFrame(() => requestAnimationFrame(done));
+  });
   if (state !== t || revision !== viewRevision) return;
   {
     const c = document.getElementById("content");
@@ -462,6 +626,21 @@ function persistActiveViewState() {
 function setupTabBar() {
   document.getElementById("tab-new").addEventListener("click", () => newEmptyTab());
   setupTabReorder(document.getElementById("tab-list"), {
+    onDragMove: async () => {
+      if (!workspace || previewBusy) return;
+      previewBusy = true;
+      try {
+        const target = await workspace.target();
+        await workspace.preview(target?.label, target?.clientX);
+      } catch { /* A window may close during a drag. */ }
+      finally { previewBusy = false; }
+    },
+    onDragEnd: () => workspace?.preview().catch(() => {}),
+    onDetach: async ({ tabId }) => {
+      if (!workspace) return;
+      const target = await workspace.target();
+      return await moveTabToWindow(tabId, target?.label, target?.clientX);
+    },
     onReorder: (ids) => {
       const byId = new Map(tabs.map(tab => [tab.id, tab]));
       if (ids.length !== tabs.length || new Set(ids).size !== tabs.length || ids.some(id => !byId.has(id))) return;
@@ -477,6 +656,7 @@ function renderTabBar() {
   for (const t of tabs) {
     const li = document.createElement("li");
     li.className = "tab" + (t.id === state?.id ? " active" : "");
+    if (movingTabs.has(t.id)) li.classList.add("tab-moving");
     li.dataset.tabId = t.id;
     li.title = t.filePath || i18n.t("tab.untitled");
 
@@ -500,6 +680,7 @@ function renderTabBar() {
     close.title = i18n.t("tab.close");
     close.addEventListener("click", async (e) => {
       e.stopPropagation();
+      if (movingTabs.has(t.id)) return;
       // If closing active tab, use the discard-confirming flow
       if (t.id === state?.id) {
         await closeActiveTab();
@@ -520,6 +701,21 @@ function renderTabBar() {
       if (t.id !== state?.id) activateTab(t.id);
     });
 
+    li.addEventListener("contextmenu", e => {
+      e.preventDefault();
+      document.querySelector(".tab-context-menu")?.remove();
+      const menu = document.createElement("div");
+      menu.className = "menu-dropdown tab-context-menu";
+      menu.style.cssText = `position:fixed;left:${Math.max(0, Math.min(e.clientX, innerWidth - 250))}px;top:${e.clientY}px`;
+      const button = document.createElement("button");
+      button.className = "menu-row";
+      button.textContent = i18n.t("tab.move_window");
+      button.addEventListener("click", () => { menu.remove(); moveTabToWindow(t.id); });
+      menu.appendChild(button);
+      document.body.appendChild(menu);
+      document.addEventListener("pointerdown", event => { if (!menu.contains(event.target)) menu.remove(); }, { once: true });
+    });
+
     // Middle-click to close
     li.addEventListener("auxclick", (e) => {
       if (e.button === 1) {
@@ -538,7 +734,8 @@ function renderTabBar() {
 function saveSession() {
   if (!sessionReady) return;
   persistActiveViewState();
-  writeSession(tabs, state?.id);
+  if (windowSession) windowSession.save(tabs, state?.id);
+  else writeSession(tabs, state?.id);
 }
 
 function updateWindowTitle() {
@@ -731,6 +928,8 @@ function setupBeforeUnload() {
 
 // Expose for debugging
 window.__app = {
+  get workspace() { return workspace; },
+  get ready() { return sessionReady; },
   get state() { return state; },
   get tabs() { return tabs; },
   get editor() { return editor; },
@@ -738,5 +937,5 @@ window.__app = {
   get statusBar() { return statusBar; },
   get fileOps() { return fileOps; },
   i18n, rerender,
-  newEmptyTab, addFileTab, activateTab, removeTab
+  newEmptyTab, addFileTab, activateTab, removeTab, moveTabToWindow, requestWindowClose
 };

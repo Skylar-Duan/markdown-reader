@@ -30,6 +30,8 @@ Windows 上的 Markdown 阅读 / 编辑器。双击 `.md` 就打开，排版漂�
 **其它**
 - 多标签：一个窗口管所有文件，每个标签独立记住模式 / 滚动位置 / 未保存状态
 - 拖动标签调整排列顺序，标签较多时拖到两侧可继续滚动
+- 标签可拖到另一窗口合并，或拖出标签栏拆成新窗口；未保存内容随标签移动
+- 已有窗口时双击文件直接添加标签，启动早期连续打开的文件会按队列处理
 - 启动时可选择恢复上次文档，保留标签顺序、阅读位置和阅读 / 编辑模式；也可开始新会话
 - 5 语言界面（简中 / 繁中 / English / 日本語 / 한국어），切换无需重启
 - 浅色 / 深色 / 跟随系统
@@ -43,6 +45,7 @@ Windows 上的 Markdown 阅读 / 编辑器。双击 `.md` 就打开，排版漂�
 | 打开 / 保存 / 另存为 | `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` |
 | 切换阅读 · 编辑 | `Ctrl+E` |
 | 新建 / 关闭标签 | `Ctrl+T` / `Ctrl+W` |
+| 新建窗口 | `Ctrl+Shift+N` |
 | 切换标签 | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
 | 查找 | `Ctrl+F` |
 | 显示 / 隐藏大纲 | `Ctrl+\` |
@@ -59,6 +62,8 @@ pnpm tauri dev      # 开发模式
 pnpm test           # 单元测试
 pnpm tauri build    # 打安装包 → src-tauri/target/release/bundle/
 ```
+
+多窗口原生回归用 `scripts/verify-workspace.mjs`：先生成前端，再用 `scripts/workspace-test.tauri.json` 构建独立测试 ID 的包，随后运行该脚本。测试窗口隐藏、数据目录独立，使用本工作区 `html-editor` 已有的 Playwright；勿将正式 exe 与真实窗口混跑。
 
 ## 技术栈
 
